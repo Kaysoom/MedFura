@@ -1,0 +1,8 @@
+{
+  "name": "Remix UniPortal - البوابة الجامعية التفاعلية",
+  "description": "تطبيق جامعي متكامل وتفاعلي يضم بنك الأتمتة، المكتبة والملفات، سوق المستلزمات والكتب الطلابية، المرئيات والشروحات، حساب المعدل والعلامات، والإعلانات مع دعم وضع المشرف والربط السحابي.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

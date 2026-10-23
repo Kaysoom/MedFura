@@ -1,0 +1,393 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Smooth transitions for theme & eye comfort switching */
+html {
+  scroll-behavior: smooth;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* =========================================================
+   1. LIGHT MODE (الوضع النهاري العادي - تباين عالٍ وواضح جداً)
+   Applies when html does NOT have .dark and does NOT have .eye-comfort
+   ========================================================= */
+html:not(.dark):not(.eye-comfort) body {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+html:not(.dark):not(.eye-comfort) .bg-\[\#0B132B\]\/90,
+html:not(.dark):not(.eye-comfort) .bg-\[\#0E172A\],
+html:not(.dark):not(.eye-comfort) .bg-\[\#0E172A\]\/90,
+html:not(.dark):not(.eye-comfort) .bg-\[\#111A2E\],
+html:not(.dark):not(.eye-comfort) .bg-\[\#111A2E\]\/95,
+html:not(.dark):not(.eye-comfort) .bg-\[\#131D2E\],
+html:not(.dark):not(.eye-comfort) .bg-\[\#131D2E\]\/80,
+html:not(.dark):not(.eye-comfort) .bg-\[\#131D2E\]\/90,
+html:not(.dark):not(.eye-comfort) .bg-\[\#131D2E\]\/95 {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+html:not(.dark):not(.eye-comfort) .bg-\[\#0E1628\],
+html:not(.dark):not(.eye-comfort) .bg-\[\#121B2B\]\/60,
+html:not(.dark):not(.eye-comfort) .bg-\[\#152036\],
+html:not(.dark):not(.eye-comfort) .bg-\[\#16223A\],
+html:not(.dark):not(.eye-comfort) .bg-\[\#162238\],
+html:not(.dark):not(.eye-comfort) .bg-\[\#182438\],
+html:not(.dark):not(.eye-comfort) .bg-\[\#152033\],
+html:not(.dark):not(.eye-comfort) .bg-\[\#152238\],
+html:not(.dark):not(.eye-comfort) .bg-slate-900,
+html:not(.dark):not(.eye-comfort) .bg-slate-900\/80,
+html:not(.dark):not(.eye-comfort) .bg-slate-800,
+html:not(.dark):not(.eye-comfort) .bg-slate-800\/60,
+html:not(.dark):not(.eye-comfort) .bg-slate-800\/70,
+html:not(.dark):not(.eye-comfort) .bg-slate-800\/80,
+html:not(.dark):not(.eye-comfort) .bg-slate-800\/90 {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* Primary & Secondary Typography in Light Mode */
+html:not(.dark):not(.eye-comfort) .text-white,
+html:not(.dark):not(.eye-comfort) .text-amber-50 {
+  color: #0f172a !important;
+}
+
+html:not(.dark):not(.eye-comfort) .text-slate-200,
+html:not(.dark):not(.eye-comfort) .text-slate-300 {
+  color: #1e293b !important;
+}
+
+html:not(.dark):not(.eye-comfort) .text-slate-400,
+html:not(.dark):not(.eye-comfort) .text-slate-500 {
+  color: #475569 !important;
+}
+
+/* High-contrast semantic accent text in Light Mode */
+html:not(.dark):not(.eye-comfort) .text-emerald-400,
+html:not(.dark):not(.eye-comfort) .text-emerald-300,
+html:not(.dark):not(.eye-comfort) .text-emerald-200 {
+  color: #047857 !important;
+}
+
+html:not(.dark):not(.eye-comfort) .text-amber-400,
+html:not(.dark):not(.eye-comfort) .text-amber-300,
+html:not(.dark):not(.eye-comfort) .text-amber-200 {
+  color: #b45309 !important;
+}
+
+html:not(.dark):not(.eye-comfort) .text-sky-400,
+html:not(.dark):not(.eye-comfort) .text-sky-300,
+html:not(.dark):not(.eye-comfort) .text-sky-200 {
+  color: #0369a1 !important;
+}
+
+html:not(.dark):not(.eye-comfort) .text-rose-400,
+html:not(.dark):not(.eye-comfort) .text-rose-300,
+html:not(.dark):not(.eye-comfort) .text-rose-200 {
+  color: #be123c !important;
+}
+
+html:not(.dark):not(.eye-comfort) .text-indigo-400,
+html:not(.dark):not(.eye-comfort) .text-indigo-300,
+html:not(.dark):not(.eye-comfort) .text-indigo-200 {
+  color: #4338ca !important;
+}
+
+html:not(.dark):not(.eye-comfort) .text-violet-400,
+html:not(.dark):not(.eye-comfort) .text-violet-300 {
+  color: #6d28d9 !important;
+}
+
+/* Semantic Surfaces (Correct / Wrong / Selected / Explanations / Notes) in Light Mode */
+html:not(.dark):not(.eye-comfort) .bg-emerald-950\/75 {
+  background-color: #dcfce7 !important;
+  border-color: #10b981 !important;
+  color: #064e3b !important;
+}
+
+html:not(.dark):not(.eye-comfort) .bg-emerald-950\/30,
+html:not(.dark):not(.eye-comfort) .bg-emerald-950\/40 {
+  background-color: #ecfdf5 !important;
+  border-color: #6ee7b7 !important;
+  color: #064e3b !important;
+}
+
+html:not(.dark):not(.eye-comfort) .bg-rose-950\/75,
+html:not(.dark):not(.eye-comfort) .bg-\[\#1A1325\] {
+  background-color: #ffe4e6 !important;
+  border-color: #f43f5e !important;
+  color: #881337 !important;
+}
+
+html:not(.dark):not(.eye-comfort) .bg-sky-950\/80 {
+  background-color: #e0f2fe !important;
+  border-color: #0284c7 !important;
+  color: #0c4a6e !important;
+}
+
+html:not(.dark):not(.eye-comfort) .bg-amber-950\/30 {
+  background-color: #fef3c7 !important;
+  border-color: #f59e0b !important;
+  color: #78350f !important;
+}
+
+html:not(.dark):not(.eye-comfort) .bg-indigo-950\/30 {
+  background-color: #e0e7ff !important;
+  border-color: #818cf8 !important;
+  color: #1e1b4b !important;
+}
+
+/* Keep solid filled buttons white-text in Light Mode */
+html:not(.dark):not(.eye-comfort) .bg-emerald-600 .text-white,
+html:not(.dark):not(.eye-comfort) .bg-emerald-600.text-white,
+html:not(.dark):not(.eye-comfort) .bg-sky-600 .text-white,
+html:not(.dark):not(.eye-comfort) .bg-sky-600.text-white,
+html:not(.dark):not(.eye-comfort) .bg-indigo-600 .text-white,
+html:not(.dark):not(.eye-comfort) .bg-indigo-600.text-white,
+html:not(.dark):not(.eye-comfort) .bg-violet-600 .text-white,
+html:not(.dark):not(.eye-comfort) .bg-violet-600.text-white,
+html:not(.dark):not(.eye-comfort) .bg-rose-600 .text-white,
+html:not(.dark):not(.eye-comfort) .bg-rose-600.text-white,
+html:not(.dark):not(.eye-comfort) .bg-amber-600 .text-white,
+html:not(.dark):not(.eye-comfort) .bg-amber-600.text-white,
+html:not(.dark):not(.eye-comfort) .bg-sky-500.text-white,
+html:not(.dark):not(.eye-comfort) .bg-indigo-500.text-white {
+  color: #ffffff !important;
+}
+
+html:not(.dark):not(.eye-comfort) .border-slate-800,
+html:not(.dark):not(.eye-comfort) .border-slate-800\/80,
+html:not(.dark):not(.eye-comfort) .border-slate-800\/90,
+html:not(.dark):not(.eye-comfort) .border-slate-700,
+html:not(.dark):not(.eye-comfort) .border-slate-700\/60,
+html:not(.dark):not(.eye-comfort) .border-slate-700\/80,
+html:not(.dark):not(.eye-comfort) .border-slate-700\/90 {
+  border-color: #cbd5e1 !important;
+}
+
+/* =========================================================
+   2. LIGHT MODE + EYE COMFORT (الوضع النهاري + حماية العين الورقي الدافئ)
+   High-contrast warm sepia ink on soft cream paper so ALL text is crystal clear
+   ========================================================= */
+html:not(.dark).eye-comfort body {
+  background-color: #efe5d2;
+  color: #1e160f;
+}
+
+html:not(.dark).eye-comfort .bg-\[\#0B132B\]\/90,
+html:not(.dark).eye-comfort .bg-\[\#171512\]\/95,
+html:not(.dark).eye-comfort .bg-\[\#0E172A\],
+html:not(.dark).eye-comfort .bg-\[\#0E172A\]\/90,
+html:not(.dark).eye-comfort .bg-\[\#111A2E\],
+html:not(.dark).eye-comfort .bg-\[\#111A2E\]\/95,
+html:not(.dark).eye-comfort .bg-\[\#131D2E\],
+html:not(.dark).eye-comfort .bg-\[\#131D2E\]\/80,
+html:not(.dark).eye-comfort .bg-\[\#131D2E\]\/90,
+html:not(.dark).eye-comfort .bg-\[\#131D2E\]\/95,
+html:not(.dark).eye-comfort .bg-\[\#1C1915\],
+html:not(.dark).eye-comfort .bg-\[\#1C1915\]\/95 {
+  background-color: #faf4e6 !important;
+  border-color: #cdb898 !important;
+  color: #1e160f !important;
+}
+
+html:not(.dark).eye-comfort .bg-\[\#0E1628\],
+html:not(.dark).eye-comfort .bg-\[\#121B2B\]\/60,
+html:not(.dark).eye-comfort .bg-\[\#152036\],
+html:not(.dark).eye-comfort .bg-\[\#16223A\],
+html:not(.dark).eye-comfort .bg-\[\#162238\],
+html:not(.dark).eye-comfort .bg-\[\#182438\],
+html:not(.dark).eye-comfort .bg-\[\#25211C\],
+html:not(.dark).eye-comfort .bg-\[\#152033\],
+html:not(.dark).eye-comfort .bg-\[\#152238\],
+html:not(.dark).eye-comfort .bg-slate-900,
+html:not(.dark).eye-comfort .bg-slate-900\/80,
+html:not(.dark).eye-comfort .bg-slate-800,
+html:not(.dark).eye-comfort .bg-slate-800\/60,
+html:not(.dark).eye-comfort .bg-slate-800\/70,
+html:not(.dark).eye-comfort .bg-slate-800\/80,
+html:not(.dark).eye-comfort .bg-slate-800\/90 {
+  background-color: #f0e5cf !important;
+  border-color: #c5ae8b !important;
+  color: #241a11 !important;
+}
+
+/* Deep Warm Espresso Ink for Primary & Secondary Text in Light Eye Comfort */
+html:not(.dark).eye-comfort .text-white,
+html:not(.dark).eye-comfort .text-amber-50 {
+  color: #1c140d !important;
+}
+
+html:not(.dark).eye-comfort .text-slate-200,
+html:not(.dark).eye-comfort .text-slate-300 {
+  color: #332519 !important;
+}
+
+html:not(.dark).eye-comfort .text-slate-400,
+html:not(.dark).eye-comfort .text-slate-500 {
+  color: #594330 !important;
+}
+
+/* High-Contrast Rich Ink Accents on Warm Sepia Paper (Fixes low-visibility text) */
+html:not(.dark).eye-comfort .text-emerald-400,
+html:not(.dark).eye-comfort .text-emerald-300,
+html:not(.dark).eye-comfort .text-emerald-200 {
+  color: #065f46 !important;
+}
+
+html:not(.dark).eye-comfort .text-amber-400,
+html:not(.dark).eye-comfort .text-amber-300,
+html:not(.dark).eye-comfort .text-amber-200 {
+  color: #92400e !important;
+}
+
+html:not(.dark).eye-comfort .text-sky-400,
+html:not(.dark).eye-comfort .text-sky-300,
+html:not(.dark).eye-comfort .text-sky-200 {
+  color: #075985 !important;
+}
+
+html:not(.dark).eye-comfort .text-rose-400,
+html:not(.dark).eye-comfort .text-rose-300,
+html:not(.dark).eye-comfort .text-rose-200 {
+  color: #9f1239 !important;
+}
+
+html:not(.dark).eye-comfort .text-indigo-400,
+html:not(.dark).eye-comfort .text-indigo-300,
+html:not(.dark).eye-comfort .text-indigo-200 {
+  color: #3730a3 !important;
+}
+
+html:not(.dark).eye-comfort .text-violet-400,
+html:not(.dark).eye-comfort .text-violet-300 {
+  color: #5b21b6 !important;
+}
+
+/* Warm Tinted Option & Explanation States in Light Eye Comfort */
+html:not(.dark).eye-comfort .bg-emerald-950\/75 {
+  background-color: #d4edda !important;
+  border-color: #15803d !important;
+  color: #052e16 !important;
+}
+
+html:not(.dark).eye-comfort .bg-emerald-950\/30,
+html:not(.dark).eye-comfort .bg-emerald-950\/40 {
+  background-color: #e3f2e6 !important;
+  border-color: #4ade80 !important;
+  color: #064e3b !important;
+}
+
+html:not(.dark).eye-comfort .bg-rose-950\/75,
+html:not(.dark).eye-comfort .bg-\[\#1A1325\] {
+  background-color: #f8d7da !important;
+  border-color: #e11d48 !important;
+  color: #4c0519 !important;
+}
+
+html:not(.dark).eye-comfort .bg-sky-950\/80 {
+  background-color: #d6eaf8 !important;
+  border-color: #0284c7 !important;
+  color: #082f49 !important;
+}
+
+html:not(.dark).eye-comfort .bg-amber-950\/30 {
+  background-color: #fae5b8 !important;
+  border-color: #d97706 !important;
+  color: #451a03 !important;
+}
+
+html:not(.dark).eye-comfort .bg-indigo-950\/30 {
+  background-color: #e0e3f5 !important;
+  border-color: #6366f1 !important;
+  color: #1e1b4b !important;
+}
+
+/* Keep solid filled buttons crisp white-text in Light Eye Comfort */
+html:not(.dark).eye-comfort .bg-emerald-600 .text-white,
+html:not(.dark).eye-comfort .bg-emerald-600.text-white,
+html:not(.dark).eye-comfort .bg-sky-600 .text-white,
+html:not(.dark).eye-comfort .bg-sky-600.text-white,
+html:not(.dark).eye-comfort .bg-indigo-600 .text-white,
+html:not(.dark).eye-comfort .bg-indigo-600.text-white,
+html:not(.dark).eye-comfort .bg-violet-600 .text-white,
+html:not(.dark).eye-comfort .bg-violet-600.text-white,
+html:not(.dark).eye-comfort .bg-rose-600 .text-white,
+html:not(.dark).eye-comfort .bg-rose-600.text-white,
+html:not(.dark).eye-comfort .bg-amber-600 .text-white,
+html:not(.dark).eye-comfort .bg-amber-600.text-white,
+html:not(.dark).eye-comfort .bg-sky-500.text-white,
+html:not(.dark).eye-comfort .bg-indigo-500.text-white {
+  color: #ffffff !important;
+}
+
+html:not(.dark).eye-comfort .border-slate-800,
+html:not(.dark).eye-comfort .border-slate-800\/80,
+html:not(.dark).eye-comfort .border-slate-800\/90,
+html:not(.dark).eye-comfort .border-slate-700,
+html:not(.dark).eye-comfort .border-slate-700\/60,
+html:not(.dark).eye-comfort .border-slate-700\/80,
+html:not(.dark).eye-comfort .border-slate-700\/90,
+html:not(.dark).eye-comfort .border-amber-900\/40,
+html:not(.dark).eye-comfort .border-amber-900\/50 {
+  border-color: #c9b393 !important;
+}
+
+/* =========================================================
+   3. DARK MODE + EYE COMFORT (الوضع الليلي + حماية العين الدافئ)
+   Low-blue-light warm obsidian & amber night reading palette
+   ========================================================= */
+html.dark.eye-comfort body {
+  background-color: #14110d;
+  color: #f5efe6;
+}
+
+html.dark.eye-comfort .bg-\[\#0B132B\]\/90,
+html.dark.eye-comfort .bg-\[\#0E172A\],
+html.dark.eye-comfort .bg-\[\#0E172A\]\/90,
+html.dark.eye-comfort .bg-\[\#111A2E\],
+html.dark.eye-comfort .bg-\[\#111A2E\]\/95,
+html.dark.eye-comfort .bg-\[\#131D2E\],
+html.dark.eye-comfort .bg-\[\#131D2E\]\/80,
+html.dark.eye-comfort .bg-\[\#131D2E\]\/90,
+html.dark.eye-comfort .bg-\[\#131D2E\]\/95,
+html.dark.eye-comfort .bg-\[\#1C1915\],
+html.dark.eye-comfort .bg-\[\#1C1915\]\/95 {
+  background-color: #1d1813 !important;
+  border-color: rgba(205, 148, 82, 0.26) !important;
+}
+
+html.dark.eye-comfort .bg-\[\#0E1628\],
+html.dark.eye-comfort .bg-\[\#152036\],
+html.dark.eye-comfort .bg-\[\#16223A\],
+html.dark.eye-comfort .bg-\[\#162238\],
+html.dark.eye-comfort .bg-\[\#182438\],
+html.dark.eye-comfort .bg-\[\#25211C\],
+html.dark.eye-comfort .bg-\[\#152033\],
+html.dark.eye-comfort .bg-\[\#152238\],
+html.dark.eye-comfort .bg-slate-900,
+html.dark.eye-comfort .bg-slate-900\/80,
+html.dark.eye-comfort .bg-slate-800,
+html.dark.eye-comfort .bg-slate-800\/80,
+html.dark.eye-comfort .bg-slate-800\/90 {
+  background-color: #262019 !important;
+  border-color: rgba(205, 148, 82, 0.22) !important;
+}
+
+html.dark.eye-comfort .text-white {
+  color: #f5efe6 !important;
+}
+
+html.dark.eye-comfort .text-slate-200,
+html.dark.eye-comfort .text-slate-300 {
+  color: #dfd3c3 !important;
+}
+
+html.dark.eye-comfort .text-slate-400 {
+  color: #b5a38d !important;
+}

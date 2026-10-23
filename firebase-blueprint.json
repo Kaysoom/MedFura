@@ -1,0 +1,133 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Student or Admin user profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "studentId": { "type": "string", "maxLength": 20 },
+        "academicYear": { "type": "string", "maxLength": 50 },
+        "role": { "type": "string", "enum": ["student", "admin"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "studentId", "academicYear", "role"]
+    },
+    "Subject": {
+      "title": "Academic Subject",
+      "description": "Course or subject taught in a university year and semester",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 100 },
+        "name": { "type": "string", "maxLength": 120 },
+        "yearId": { "type": "string", "maxLength": 50 },
+        "semester": { "type": "string", "enum": ["first", "second"] },
+        "icon": { "type": "string", "maxLength": 50 },
+        "questionsCount": { "type": "number" },
+        "filesCount": { "type": "number" }
+      },
+      "required": ["id", "name", "yearId", "semester"]
+    },
+    "Question": {
+      "title": "Question Bank Item",
+      "description": "MCQ automated practice question",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 100 },
+        "subjectId": { "type": "string", "maxLength": 100 },
+        "chapter": { "type": "string", "maxLength": 100 },
+        "questionText": { "type": "string", "maxLength": 1000 },
+        "optionA": { "type": "string", "maxLength": 300 },
+        "optionB": { "type": "string", "maxLength": 300 },
+        "optionC": { "type": "string", "maxLength": 300 },
+        "optionD": { "type": "string", "maxLength": 300 },
+        "correctOptionIndex": { "type": "number" },
+        "explanation": { "type": "string", "maxLength": 1000 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "subjectId", "questionText", "optionA", "optionB", "correctOptionIndex"]
+    },
+    "MarketplaceItem": {
+      "title": "Student Market Listing",
+      "description": "Used books, notes, medical/engineering tools listing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 100 },
+        "title": { "type": "string", "maxLength": 150 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "category": { "type": "string", "enum": ["مراجع وكتب جامعية", "نوط وملخصات", "أدوات ومستلزمات", "أخرى"] },
+        "academicYear": { "type": "string", "maxLength": 50 },
+        "dealType": { "type": "string", "enum": ["بيع", "إعارة", "إهداء"] },
+        "price": { "type": "string", "maxLength": 50 },
+        "status": { "type": "string", "enum": ["متاح", "تم البيع"] },
+        "imageUrl": { "type": "string", "maxLength": 50000 },
+        "telegramUsername": { "type": "string", "maxLength": 60 },
+        "whatsappNumber": { "type": "string", "maxLength": 30 },
+        "sellerId": { "type": "string", "maxLength": 128 },
+        "sellerName": { "type": "string", "maxLength": 100 },
+        "sellerEmail": { "type": "string", "maxLength": 200 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "title", "category", "academicYear", "dealType", "price", "status", "telegramUsername", "whatsappNumber", "sellerId"]
+    },
+    "LibraryItem": {
+      "title": "Library PDF or File",
+      "description": "Lecture notes, past exams, or reference sheets",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 100 },
+        "subjectId": { "type": "string", "maxLength": 100 },
+        "title": { "type": "string", "maxLength": 150 },
+        "fileType": { "type": "string", "enum": ["نوطة / ملخص", "دورة امتحانية", "كتاب / مرجع", "أوراق عمل"] },
+        "author": { "type": "string", "maxLength": 100 },
+        "fileSize": { "type": "string", "maxLength": 30 },
+        "downloadUrl": { "type": "string", "maxLength": 500 },
+        "downloadsCount": { "type": "number" }
+      },
+      "required": ["id", "subjectId", "title", "fileType"]
+    },
+    "Announcement": {
+      "title": "University Notice",
+      "description": "Official student council and faculty announcements",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 100 },
+        "title": { "type": "string", "maxLength": 150 },
+        "content": { "type": "string", "maxLength": 2000 },
+        "category": { "type": "string", "enum": ["رسمي", "امتحانات", "الهيئة الطلابية", "فعاليات"] },
+        "date": { "type": "string", "maxLength": 50 },
+        "isPinned": { "type": "boolean" }
+      },
+      "required": ["id", "title", "content", "category"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Student profiles with academic IDs and years"
+    },
+    "/subjects/{subjectId}": {
+      "schema": "Subject",
+      "description": "Course catalog grouped by year and semester"
+    },
+    "/questions/{questionId}": {
+      "schema": "Question",
+      "description": "MCQ automated practice questions"
+    },
+    "/marketplace_items/{itemId}": {
+      "schema": "MarketplaceItem",
+      "description": "Student market listings for books and tools"
+    },
+    "/library_items/{itemId}": {
+      "schema": "LibraryItem",
+      "description": "Study files and resources"
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "Student union announcements and notices"
+    }
+  }
+}
