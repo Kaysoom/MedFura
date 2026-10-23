@@ -90,6 +90,17 @@ function sanitizeForFirestore<T>(obj: T): T {
   return cleaned as T;
 }
 
+function safeLoadStorage<T>(key: string, fallback: T): T {
+  try {
+    const saved = localStorage.getItem(key);
+    if (!saved) return fallback;
+    const parsed = JSON.parse(saved);
+    return parsed !== null && parsed !== undefined ? (parsed as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 interface AppContextType {
   user: UserProfile | null;
   isAdmin: boolean;
@@ -303,10 +314,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Default User: Dr. Mohammed Al-Kaysoum (matching Screenshot 1: د. محمد)
-  const [user, setUser] = useState<UserProfile | null>(() => {
-    const saved = localStorage.getItem('uniportal_user_v3');
-    if (saved) return JSON.parse(saved);
-    return {
+  const [user, setUser] = useState<UserProfile | null>(() =>
+    safeLoadStorage<UserProfile | null>('uniportal_user_v3', {
       uid: 'admin-uid-99',
       email: ADMIN_EMAIL,
       displayName: 'د. محمد',
@@ -319,8 +328,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       role: 'admin',
       blockedUsers: [],
       createdAt: new Date().toISOString()
-    };
-  });
+    })
+  );
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
@@ -363,123 +372,99 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Collections state
-  const [subjects, setSubjects] = useState<SubjectItem[]>(() => {
-    const saved = localStorage.getItem('uniportal_subjects_v6');
-    return saved ? JSON.parse(saved) : INITIAL_SUBJECTS;
-  });
+  const [subjects, setSubjects] = useState<SubjectItem[]>(() =>
+    safeLoadStorage('uniportal_subjects_v6', INITIAL_SUBJECTS)
+  );
 
-  const [questions, setQuestions] = useState<QuestionItem[]>(() => {
-    const saved = localStorage.getItem('uniportal_questions_v6');
-    return saved ? JSON.parse(saved) : INITIAL_QUESTIONS;
-  });
+  const [questions, setQuestions] = useState<QuestionItem[]>(() =>
+    safeLoadStorage('uniportal_questions_v6', INITIAL_QUESTIONS)
+  );
 
-  const [libraryFolders, setLibraryFolders] = useState<LibraryFolderItem[]>(() => {
-    const saved = localStorage.getItem('uniportal_folders_v3');
-    return saved ? JSON.parse(saved) : INITIAL_LIBRARY_FOLDERS;
-  });
+  const [libraryFolders, setLibraryFolders] = useState<LibraryFolderItem[]>(() =>
+    safeLoadStorage('uniportal_folders_v3', INITIAL_LIBRARY_FOLDERS)
+  );
 
-  const [libraryFiles, setLibraryFiles] = useState<LibraryFileItem[]>(() => {
-    const saved = localStorage.getItem('uniportal_libfiles_v3');
-    return saved ? JSON.parse(saved) : INITIAL_LIBRARY_FILES;
-  });
+  const [libraryFiles, setLibraryFiles] = useState<LibraryFileItem[]>(() =>
+    safeLoadStorage('uniportal_libfiles_v3', INITIAL_LIBRARY_FILES)
+  );
 
-  const [marketplaceItems, setMarketplaceItems] = useState<MarketplaceItem[]>(() => {
-    const saved = localStorage.getItem('uniportal_market_v3');
-    return saved ? JSON.parse(saved) : INITIAL_MARKETPLACE;
-  });
+  const [marketplaceItems, setMarketplaceItems] = useState<MarketplaceItem[]>(() =>
+    safeLoadStorage('uniportal_market_v3', INITIAL_MARKETPLACE)
+  );
 
-  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(() => {
-    const saved = localStorage.getItem('uniportal_announcements_v3');
-    return saved ? JSON.parse(saved) : INITIAL_ANNOUNCEMENTS;
-  });
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(() =>
+    safeLoadStorage('uniportal_announcements_v3', INITIAL_ANNOUNCEMENTS)
+  );
 
   // Video Folders Tree (matching Library Folders)
-  const [videoFolders, setVideoFolders] = useState<VideoFolderItem[]>(() => {
-    const saved = localStorage.getItem('uniportal_videofolders_v4');
-    return saved ? JSON.parse(saved) : INITIAL_VIDEO_FOLDERS;
-  });
+  const [videoFolders, setVideoFolders] = useState<VideoFolderItem[]>(() =>
+    safeLoadStorage('uniportal_videofolders_v4', INITIAL_VIDEO_FOLDERS)
+  );
 
   // Videos (clean reset - no mock data)
-  const [videos, setVideos] = useState<VideoItem[]>(() => {
-    const saved = localStorage.getItem('uniportal_videos_v5');
-    return saved ? JSON.parse(saved) : INITIAL_VIDEOS;
-  });
+  const [videos, setVideos] = useState<VideoItem[]>(() =>
+    safeLoadStorage('uniportal_videos_v5', INITIAL_VIDEOS)
+  );
 
-  const [discussions, setDiscussions] = useState<DiscussionPost[]>(() => {
-    const saved = localStorage.getItem('uniportal_discussions_v3');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [discussions, setDiscussions] = useState<DiscussionPost[]>(() =>
+    safeLoadStorage('uniportal_discussions_v3', [])
+  );
 
-  const [directMessages, setDirectMessages] = useState<DirectMessage[]>(() => {
-    const saved = localStorage.getItem('uniportal_direct_msgs_v3');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [directMessages, setDirectMessages] = useState<DirectMessage[]>(() =>
+    safeLoadStorage('uniportal_direct_msgs_v3', [])
+  );
 
   // Telegram-like Community Channels & Messages (clean reset - includes supervisors channel)
-  const [channels, setChannels] = useState<ChannelInfo[]>(() => {
-    const saved = localStorage.getItem('uniportal_channels_v4');
-    return saved ? JSON.parse(saved) : INITIAL_CHANNELS;
-  });
+  const [channels, setChannels] = useState<ChannelInfo[]>(() =>
+    safeLoadStorage('uniportal_channels_v4', INITIAL_CHANNELS)
+  );
   const [activeChannelId, setActiveChannelId] = useState<string>('general');
-  const [communityMessages, setCommunityMessages] = useState<import('../types').CommunityMessage[]>(() => {
-    const saved = localStorage.getItem('uniportal_comm_msgs_v4');
-    return saved ? JSON.parse(saved) : INITIAL_COMMUNITY_MESSAGES;
-  });
-  const [joinRequests, setJoinRequests] = useState<import('../types').ChannelJoinRequest[]>(() => {
-    const saved = localStorage.getItem('uniportal_join_reqs_v3');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [blockedUsers, setBlockedUsers] = useState<string[]>(() => {
-    const saved = localStorage.getItem('uniportal_blocked_v3');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [communityMessages, setCommunityMessages] = useState<import('../types').CommunityMessage[]>(() =>
+    safeLoadStorage('uniportal_comm_msgs_v4', INITIAL_COMMUNITY_MESSAGES)
+  );
+  const [joinRequests, setJoinRequests] = useState<import('../types').ChannelJoinRequest[]>(() =>
+    safeLoadStorage('uniportal_join_reqs_v3', [])
+  );
+  const [blockedUsers, setBlockedUsers] = useState<string[]>(() =>
+    safeLoadStorage('uniportal_blocked_v3', [])
+  );
 
   // Grades & Leaderboard System (Percentage only)
-  const [grades, setGrades] = useState<GradeItem[]>(() => {
-    const saved = localStorage.getItem('uniportal_grades_v5');
-    return saved ? JSON.parse(saved) : INITIAL_GRADES;
-  });
-  const [leaderboard, setLeaderboard] = useState<StudentLeaderboardEntry[]>(() => {
-    const saved = localStorage.getItem('uniportal_leaderboard_v5');
-    return saved ? JSON.parse(saved) : INITIAL_LEADERBOARD;
-  });
-  const [gradeAppeals, setGradeAppeals] = useState<GradeAppealTicket[]>(() => {
-    const saved = localStorage.getItem('uniportal_appeals_v5');
-    return saved ? JSON.parse(saved) : INITIAL_GRADE_APPEALS;
-  });
+  const [grades, setGrades] = useState<GradeItem[]>(() =>
+    safeLoadStorage('uniportal_grades_v5', INITIAL_GRADES)
+  );
+  const [leaderboard, setLeaderboard] = useState<StudentLeaderboardEntry[]>(() =>
+    safeLoadStorage('uniportal_leaderboard_v5', INITIAL_LEADERBOARD)
+  );
+  const [gradeAppeals, setGradeAppeals] = useState<GradeAppealTicket[]>(() =>
+    safeLoadStorage('uniportal_appeals_v5', INITIAL_GRADE_APPEALS)
+  );
 
   // Enhanced Automation Bank State
-  const [savedQuestionIds, setSavedQuestionIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('uniportal_saved_qids');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [questionNotes, setQuestionNotes] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('uniportal_q_notes');
-    return saved ? JSON.parse(saved) : {};
-  });
-  const [wrongQuestionIds, setWrongQuestionIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('uniportal_wrong_qids');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [solvedQuestions, setSolvedQuestions] = useState<Record<string, { chosenOption: number; isCorrect: boolean }>>(() => {
-    const saved = localStorage.getItem('uniportal_solved_qs');
-    return saved ? JSON.parse(saved) : {};
-  });
-  const [chapterLastIndex, setChapterLastIndex] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem('uniportal_chapter_last_idx');
-    return saved ? JSON.parse(saved) : {};
-  });
+  const [savedQuestionIds, setSavedQuestionIds] = useState<string[]>(() =>
+    safeLoadStorage('uniportal_saved_qids', [])
+  );
+  const [questionNotes, setQuestionNotes] = useState<Record<string, string>>(() =>
+    safeLoadStorage('uniportal_q_notes', {})
+  );
+  const [wrongQuestionIds, setWrongQuestionIds] = useState<string[]>(() =>
+    safeLoadStorage('uniportal_wrong_qids', [])
+  );
+  const [solvedQuestions, setSolvedQuestions] = useState<Record<string, { chosenOption: number; isCorrect: boolean }>>(() =>
+    safeLoadStorage('uniportal_solved_qs', {})
+  );
+  const [chapterLastIndex, setChapterLastIndex] = useState<Record<string, number>>(() =>
+    safeLoadStorage('uniportal_chapter_last_idx', {})
+  );
 
   // MedFur Question Discussions & Reports State
-  const [questionComments, setQuestionComments] = useState<QuestionCommentItem[]>(() => {
-    const saved = localStorage.getItem('medfur_q_comments_v1');
-    return saved ? JSON.parse(saved) : INITIAL_QUESTION_COMMENTS;
-  });
+  const [questionComments, setQuestionComments] = useState<QuestionCommentItem[]>(() =>
+    safeLoadStorage('medfur_q_comments_v1', INITIAL_QUESTION_COMMENTS)
+  );
 
-  const [questionReports, setQuestionReports] = useState<QuestionReportItem[]>(() => {
-    const saved = localStorage.getItem('medfur_q_reports_v1');
-    return saved ? JSON.parse(saved) : INITIAL_QUESTION_REPORTS;
-  });
+  const [questionReports, setQuestionReports] = useState<QuestionReportItem[]>(() =>
+    safeLoadStorage('medfur_q_reports_v1', INITIAL_QUESTION_REPORTS)
+  );
 
   // Direct Peer-to-Peer Chat
   const [activeChatPartner, setActiveChatPartner] = useState<{ uid: string; displayName: string; email?: string } | null>(null);
@@ -582,7 +567,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('medfur_q_reports_v1', JSON.stringify(questionReports));
   }, [questionReports]);
 
-  const isAdmin = user?.role === 'admin' || user?.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const isAdmin = user?.role === 'admin' || user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
   const quickSwitchPersona = (role: 'admin' | 'student') => {
     if (role === 'admin') {
@@ -1106,7 +1091,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     poll?: import('../types').PollData;
     mcq?: import('../types').MCQData;
   }) => {
-    const isAdm = user?.role === 'admin' || user?.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    const isAdm = user?.role === 'admin' || user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
     let badge: '2' | '3' | '0' = '0';
     if (user?.yearBadge) {
       badge = user.yearBadge;
@@ -1507,7 +1492,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // MedFur Question Discussions & Reports Actions
   const addQuestionComment = async (questionId: string, content: string) => {
     if (!content.trim()) return;
-    const isAdm = user?.role === 'admin' || user?.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    const isAdm = user?.role === 'admin' || user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
     const authorFullName = user
       ? `${user.displayName}${user.lastName && !user.displayName.includes(user.lastName) ? ` ${user.lastName}` : ''}`
       : 'طالب طب بشري';

@@ -15,6 +15,37 @@
   </head>
   <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-['Cairo',sans-serif] antialiased selection:bg-indigo-500 selection:text-white">
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="./src/main.tsx"></script>
+    <script>
+      // Diagnostic check if GitHub Pages is serving raw unbuilt source instead of the compiled dist/ folder
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          var root = document.getElementById('root');
+          if (root && root.innerHTML.trim() === '' && window.location.hostname.indexOf('github.io') !== -1) {
+            var scripts = document.querySelectorAll('script[type="module"]');
+            var isRawSource = false;
+            for (var i = 0; i < scripts.length; i++) {
+              var src = scripts[i].getAttribute('src') || '';
+              if (src.indexOf('.tsx') !== -1 || src.indexOf('/src/') !== -1) {
+                isRawSource = true;
+              }
+            }
+            if (isRawSource) {
+              root.innerHTML =
+                '<div dir="rtl" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#0f172a;color:#f8fafc;font-family:Cairo,sans-serif;text-align:right;">' +
+                '<div style="max-width:600px;background:#1e293b;border:1px solid #334155;border-radius:16px;padding:28px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.5);">' +
+                '<h2 style="margin:0 0 12px;color:#10b981;font-size:20px;font-weight:800;">تنبيه إعداد GitHub Pages (خطوة واحدة متبقية)</h2>' +
+                '<p style="margin:0 0 16px;line-height:1.8;color:#cbd5e1;font-size:14px;">يبدو أن GitHub Pages يقوم حالياً بعرض ملفات الكود المصدري الخام (<code>.tsx</code>) بدلاً من النسخة المبنية (<code>dist</code>).</p>' +
+                '<ol style="margin:0 0 16px;padding-right:20px;line-height:2;color:#e2e8f0;font-size:14px;">' +
+                '<li>افتح مستودعك في GitHub ثم اذهب إلى <b>Settings</b> &rarr; <b>Pages</b>.</li>' +
+                '<li>تحت قسم <b>Build and deployment</b>، غيّر خيار <b>Source</b> من <code>Deploy from a branch</code> إلى <b><code>GitHub Actions</code></b>.</li>' +
+                '<li>سيقوم ملف <code>.github/workflows/deploy.yml</code> ببناء الموقع ونشره تلقائياً خلال دقيقة واحدة.</li>' +
+                '</ol>' +
+                '</div></div>';
+            }
+          }
+        }, 3500);
+      });
+    </script>
   </body>
 </html>
