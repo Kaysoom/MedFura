@@ -147,7 +147,7 @@ export const PWAInstallInstructionsModal: React.FC<{
             <X className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <div>
               <h3 className="font-black text-sm sm:text-base text-white">
                 تثبيت تطبيق MedFur على جهازك
@@ -156,7 +156,6 @@ export const PWAInstallInstructionsModal: React.FC<{
                 كلية الطب البشري — جامعة الفرات
               </p>
             </div>
-            <MedFurMonogramBadge className="w-11 h-11" />
           </div>
         </div>
 
@@ -272,23 +271,20 @@ export const PWAInstallPrompt: React.FC = () => {
             <button
               type="button"
               onClick={triggerInstall}
-              className="px-3 py-2 rounded-xl bg-gradient-to-l from-emerald-600 to-sky-600 hover:from-emerald-500 hover:to-sky-500 text-white text-xs font-black flex items-center gap-1.5 shadow-md cursor-pointer transition-all"
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-l from-emerald-600 to-sky-600 hover:from-emerald-500 hover:to-sky-500 text-white text-xs font-black flex items-center gap-1.5 shadow-md cursor-pointer transition-all"
             >
               <Download className="w-3.5 h-3.5" />
               <span>تثبيت</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-2.5 min-w-0 flex-1 justify-end">
-            <div className="min-w-0 flex-1 text-right">
-              <h4 className="text-xs font-black text-white truncate">
-                تثبيت تطبيق MedFur على هاتفك
-              </h4>
-              <p className="text-[10px] text-slate-300 truncate">
-                تصفح أسرع للأتمتة والمحاضرات بشاشة كاملة
-              </p>
-            </div>
-            <MedFurMonogramBadge className="w-10 h-10" />
+          <div className="min-w-0 flex-1 text-right">
+            <h4 className="text-xs font-black text-white truncate">
+              تثبيت تطبيق <span className="text-emerald-400">MedFur</span> على هاتفك
+            </h4>
+            <p className="text-[10px] text-slate-300 truncate">
+              تصفح أسرع للأتمتة والمحاضرات بشاشة كاملة
+            </p>
           </div>
         </div>
       )}

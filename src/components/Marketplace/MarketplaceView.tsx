@@ -86,20 +86,20 @@ export const MarketplaceView: React.FC = () => {
   };
 
   return (
-    <div className="max-w-md mx-auto sm:max-w-3xl lg:max-w-4xl px-4 py-4 space-y-5">
+    <div className="w-full max-w-md mx-auto sm:max-w-3xl lg:max-w-4xl px-3.5 py-3.5 space-y-4 overflow-x-hidden">
       
       {/* Top Header */}
-      <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+      <div className="flex items-center justify-between pb-2 border-b border-slate-800 gap-2">
         <button
           onClick={() => setActiveSection('home')}
-          className="p-1.5 rounded-xl text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer flex items-center gap-1 text-xs font-bold"
+          className="p-1.5 rounded-xl text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer flex items-center gap-1 text-xs font-bold shrink-0"
           title="العودة للرئيسية"
         >
-          <ChevronRight className="w-5 h-5" />
+          <ChevronRight className="w-4 h-4" />
           <span>الرئيسية</span>
         </button>
 
-        <h1 className="text-lg sm:text-xl font-black text-emerald-400 text-center">
+        <h1 className="text-sm sm:text-lg font-black text-emerald-400 text-center truncate">
           سوق المستلزمات والكتب
         </h1>
 
@@ -111,27 +111,27 @@ export const MarketplaceView: React.FC = () => {
               setIsAddModalOpen(true);
             }
           }}
-          className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-1 transition-all cursor-pointer shadow-md"
+          className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[11px] sm:text-xs flex items-center gap-1 transition-all cursor-pointer shadow-md shrink-0"
         >
-          <Plus className="w-4 h-4 stroke-[3]" />
+          <Plus className="w-3.5 h-3.5 stroke-[3]" />
           <span>إضافة إعلان</span>
         </button>
       </div>
 
       {/* Search Input */}
       <div className="relative">
-        <Search className="absolute right-3.5 top-3.5 w-4 h-4 text-slate-400" />
+        <Search className="absolute right-3.5 top-3 w-4 h-4 text-slate-400" />
         <input
           type="text"
           placeholder="ابحث عن نوطة، كتاب، سماعة طبية، أدوات، أو اسم البائع..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pr-10 pl-4 py-2.5 bg-[#131D2E] border border-slate-800 rounded-2xl text-xs sm:text-sm font-semibold text-white placeholder:text-slate-500 focus:outline-hidden focus:border-amber-500"
+          className="w-full pr-10 pl-4 py-2 bg-[#131D2E] border border-slate-800 rounded-2xl text-xs sm:text-sm font-semibold text-white placeholder:text-slate-500 focus:outline-hidden focus:border-amber-500"
         />
         {searchQuery && (
           <button
             onClick={() => setSearchQuery('')}
-            className="absolute left-3.5 top-2.5 text-xs text-slate-400 hover:text-white cursor-pointer"
+            className="absolute left-3.5 top-2 text-xs text-slate-400 hover:text-white cursor-pointer"
           >
             مسح
           </button>
@@ -139,15 +139,15 @@ export const MarketplaceView: React.FC = () => {
       </div>
 
       {/* Filter Buttons Strip: Categories [الكل / جامعي / غير جامعي] & Deal Type [الكل / بيع / إيجار / إعارة] */}
-      <div className="space-y-2.5 bg-[#131D2E] p-3 rounded-2xl border border-slate-800">
+      <div className="space-y-2 bg-[#131D2E] p-3 rounded-2xl border border-slate-800">
         
         {/* Category Toggles: Strictly [جامعي / غير جامعي] */}
-        <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+        <div className="flex flex-wrap items-center justify-between gap-1.5 text-xs font-bold text-slate-300">
           <span>التصنيف:</span>
-          <div className="flex bg-[#0E172A] p-1 rounded-xl gap-1">
+          <div className="flex flex-wrap bg-[#0E172A] p-1 rounded-xl gap-1">
             <button
               onClick={() => setFilterCategory('all')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                 filterCategory === 'all'
                   ? 'bg-amber-500 text-slate-950 shadow-xs'
                   : 'text-slate-400 hover:text-white'
@@ -157,7 +157,7 @@ export const MarketplaceView: React.FC = () => {
             </button>
             <button
               onClick={() => setFilterCategory('جامعية')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                 filterCategory === 'جامعية'
                   ? 'bg-amber-500 text-slate-950 shadow-xs'
                   : 'text-slate-400 hover:text-white'
@@ -167,7 +167,7 @@ export const MarketplaceView: React.FC = () => {
             </button>
             <button
               onClick={() => setFilterCategory('غير جامعية')}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                 filterCategory === 'غير جامعية'
                   ? 'bg-amber-500 text-slate-950 shadow-xs'
                   : 'text-slate-400 hover:text-white'
@@ -178,10 +178,10 @@ export const MarketplaceView: React.FC = () => {
           </div>
         </div>
 
-        {/* Deal Types Toggles: [الكل / بيع / إيجار / إعارة] */}
-        <div className="flex items-center justify-between text-xs font-bold text-slate-300 pt-2 border-t border-slate-800">
+        {/* Deal Types Toggles: [الكل / بيع / إيجار / إعارة / إهداء] */}
+        <div className="flex flex-wrap items-center justify-between gap-1.5 text-xs font-bold text-slate-300 pt-2 border-t border-slate-800">
           <span>نوع العرض:</span>
-          <div className="flex bg-[#0E172A] p-1 rounded-xl gap-1">
+          <div className="flex flex-wrap bg-[#0E172A] p-1 rounded-xl gap-1">
             {[
               { id: 'all', label: 'الكل' },
               { id: 'بيع', label: 'بيع' },
@@ -192,7 +192,7 @@ export const MarketplaceView: React.FC = () => {
               <button
                 key={type.id}
                 onClick={() => setFilterDealType(type.id)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                   filterDealType === type.id
                     ? 'bg-emerald-600 text-white shadow-xs'
                     : 'text-slate-400 hover:text-white'
@@ -205,14 +205,14 @@ export const MarketplaceView: React.FC = () => {
         </div>
 
         {/* Status Toggles: [الكل / متاح / تم البيع] */}
-        <div className="flex items-center justify-between text-xs font-bold text-slate-300 pt-2 border-t border-slate-800">
+        <div className="flex flex-wrap items-center justify-between gap-1.5 text-xs font-bold text-slate-300 pt-2 border-t border-slate-800">
           <span>الحالة:</span>
-          <div className="flex bg-[#0E172A] p-1 rounded-xl gap-1">
+          <div className="flex flex-wrap bg-[#0E172A] p-1 rounded-xl gap-1">
             {(['all', 'متاح', 'تم البيع'] as const).map(st => (
               <button
                 key={st}
                 onClick={() => setFilterStatus(st)}
-                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                   filterStatus === st
                     ? 'bg-slate-700 text-white shadow-xs'
                     : 'text-slate-400 hover:text-white'

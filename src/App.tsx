@@ -141,7 +141,7 @@ const AppContent: React.FC = () => {
       <Header />
 
       {/* Main View Area */}
-      <main className={`flex-1 w-full max-w-full min-w-0 flex flex-col ${activeSection === 'discussions' ? 'h-screen overflow-hidden' : 'pb-16'}`}>
+      <main className={`flex-1 w-full max-w-full min-w-0 flex flex-col ${activeSection === 'discussions' ? 'h-[calc(100dvh-50px)] overflow-hidden' : 'pb-16'}`}>
         {activeSection === 'home' && <HomeDashboard />}
         {activeSection === 'automation' && <AutomationBankView />}
         {activeSection === 'library' && <LibraryView />}

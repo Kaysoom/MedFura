@@ -322,12 +322,12 @@ export const VideosView: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-6 text-right selection:bg-rose-500 selection:text-white overflow-x-hidden">
+    <div className="w-full max-w-md mx-auto sm:max-w-3xl lg:max-w-4xl px-3.5 py-3.5 space-y-4 text-right selection:bg-rose-500 selection:text-white overflow-x-hidden">
       
       {/* Toast Notification */}
       {downloadNotice && (
-        <div className="fixed bottom-6 left-6 z-50 bg-slate-900 border border-emerald-500/50 text-white p-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom duration-300">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+        <div className="fixed bottom-6 left-6 z-50 bg-slate-900 border border-emerald-500/50 text-white p-3.5 rounded-2xl shadow-2xl flex items-center gap-2.5 animate-in slide-in-from-bottom duration-300">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span className="text-xs font-bold">{downloadNotice}</span>
         </div>
       )}
@@ -336,20 +336,20 @@ export const VideosView: React.FC = () => {
       {/* VIEW A: LIST OF SUBJECTS (شاشة القائمة والمواد)             */}
       {/* ======================================================== */}
       {!selectedSubjectId ? (
-        <div className="space-y-6 animate-in fade-in duration-200">
+        <div className="space-y-4 animate-in fade-in duration-200">
           
-          {/* Header Controls Banner */}
-          <div className="bg-gradient-to-r from-rose-700 via-pink-700 to-rose-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-xs font-bold text-rose-100">
+          {/* Compact Header Controls Banner */}
+          <div className="bg-gradient-to-r from-rose-700 via-pink-700 to-rose-900 text-white p-4 sm:p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/15 text-[11px] font-bold text-rose-100">
                 <Film className="w-3.5 h-3.5" />
-                <span>المرئيات والشروحات الأكاديمية (Media Hub)</span>
+                <span>المرئيات والشروحات الأكاديمية</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black">
+              <h1 className="text-base sm:text-2xl font-black leading-snug">
                 بوابة الفيديوهات والمحاضرات المصورة
               </h1>
-              <p className="text-xs sm:text-sm text-rose-100 max-w-xl leading-relaxed">
-                شروحات سريرية ونظرية ومقاطع تشريح ثلاثية الأبعاد مصنفة بالدقة حسب السنة والفصل والمقرر.
+              <p className="text-[11px] sm:text-xs text-rose-100 max-w-xl leading-relaxed">
+                شروحات سريرية ونظرية ومقاطع تشريح مصنفة حسب السنة والفصل والمقرر.
               </p>
             </div>
 
@@ -366,25 +366,25 @@ export const VideosView: React.FC = () => {
                   setUploadSubjectId(availableSubjects[0]?.id || '');
                   setIsUploadModalOpen(true);
                 }}
-                className="px-5 py-3 rounded-2xl bg-white text-rose-700 hover:bg-rose-50 text-xs sm:text-sm font-black transition-all cursor-pointer shadow-lg flex items-center justify-center gap-2 shrink-0 self-start md:self-auto"
+                className="px-3.5 py-2 rounded-xl bg-white text-rose-700 hover:bg-rose-50 text-xs font-black transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5 shrink-0 self-start sm:self-auto"
               >
-                <Upload className="w-4 h-4" />
-                <span>رفع فيديو جديد من الجهاز</span>
+                <Upload className="w-3.5 h-3.5" />
+                <span>رفع فيديو جديد</span>
               </button>
             )}
           </div>
 
           {/* Filter Bar: Dropdown for Academic Year & Toggle Buttons for Semesters */}
-          <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="bg-white dark:bg-slate-900 p-3.5 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between gap-3">
             
             {/* 1. Academic Year In-App Selector */}
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <span className="text-xs font-black text-slate-500 shrink-0">السنة الدراسية:</span>
-              <div className="flex-1 sm:w-64">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-xs font-black text-slate-500 shrink-0">السنة:</span>
+              <div className="flex-1 sm:w-60">
                 <InAppSelect<AcademicYearId>
                   value={selectedYear}
                   onChange={(val) => setSelectedYear(val)}
-                  size="md"
+                  size="sm"
                   variant="adaptive"
                   icon={<GraduationCap className="w-4 h-4" />}
                   options={academicYearsList.map((yr) => ({
@@ -395,15 +395,14 @@ export const VideosView: React.FC = () => {
               </div>
             </div>
 
-            {/* 2. Semester Toggle Buttons (أزرار تبديل الفصول: الفصل الأول / الفصل الثاني) */}
-            <div className="flex items-center gap-2 self-center">
-              <span className="text-xs font-black text-slate-500 shrink-0 hidden sm:inline">الفصل:</span>
-              <div className="p-1 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center gap-1">
+            {/* 2. Semester Toggle Buttons */}
+            <div className="flex items-center justify-between sm:justify-end gap-2">
+              <div className="p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center gap-1">
                 <button
                   onClick={() => setSelectedSemester('first')}
-                  className={`px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     selectedSemester === 'first'
-                      ? 'bg-rose-600 text-white shadow-md'
+                      ? 'bg-rose-600 text-white shadow-xs'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
@@ -411,20 +410,19 @@ export const VideosView: React.FC = () => {
                 </button>
                 <button
                   onClick={() => setSelectedSemester('second')}
-                  className={`px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     selectedSemester === 'second'
-                      ? 'bg-rose-600 text-white shadow-md'
+                      ? 'bg-rose-600 text-white shadow-xs'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   الفصل الثاني
                 </button>
               </div>
-            </div>
 
-            {/* Video Total Indicator */}
-            <div className="text-xs font-bold text-slate-400 font-mono">
-              {availableSubjects.length} مقررات متاحة
+              <div className="text-[11px] font-bold text-slate-400 font-mono shrink-0">
+                {availableSubjects.length} مقررات
+              </div>
             </div>
           </div>
 
@@ -539,37 +537,35 @@ export const VideosView: React.FC = () => {
 
           {/* 1. Top Bar showing Doctor's Name, Dedicated Course, Video Count & Hours */}
           {activeSubject && (
-            <div className="bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 border border-rose-500/30 p-5 sm:p-6 rounded-3xl text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-5">
-              <div className="space-y-2 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-rose-300">
-                    {selectedSemester === 'first' ? 'الفصل الأول' : 'الفصل الثاني'} • {academicYearsList.find(y => y.id === selectedYear)?.name}
-                  </span>
-                </div>
-                <h2 className="text-xl sm:text-3xl font-black break-words">
+            <div className="bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 border border-rose-500/30 p-4 sm:p-5 rounded-2xl text-white shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+              <div className="space-y-1.5 min-w-0">
+                <span className="text-[11px] text-rose-300 block">
+                  {selectedSemester === 'first' ? 'الفصل الأول' : 'الفصل الثاني'} • {academicYearsList.find(y => y.id === selectedYear)?.name}
+                </span>
+                <h2 className="text-base sm:text-2xl font-black break-words">
                   مرئيات مقرر {activeSubject.name}
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-300 flex items-center gap-2">
-                  <User className="w-4 h-4 text-rose-400 shrink-0" />
-                  <span>
-                    إشراف {activeSubject.department || 'الكادر الأكاديمي للكلية'} • الدورة النظرية والعملية المكثفة
+                <p className="text-[11px] sm:text-xs text-slate-300 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                  <span className="truncate">
+                    إشراف {activeSubject.department || 'الكادر الأكاديمي للكلية'}
                   </span>
                 </p>
               </div>
 
               {/* Stats Box */}
-              <div className="flex items-center gap-4 bg-white/5 border border-white/10 p-3.5 px-5 rounded-2xl shrink-0 self-start md:self-auto font-mono text-center">
-                <div className="px-3 border-l border-white/10">
-                  <div className="text-xl sm:text-2xl font-black text-rose-400">
+              <div className="flex items-center gap-3 bg-white/5 border border-white/10 p-2.5 px-4 rounded-xl shrink-0 self-start sm:self-auto font-mono text-center">
+                <div className="px-2.5 border-l border-white/10">
+                  <div className="text-base sm:text-xl font-black text-rose-400">
                     {displayedVideos.length}
                   </div>
-                  <div className="text-[10px] text-slate-400 font-sans">فيديو متاح</div>
+                  <div className="text-[10px] text-slate-400 font-sans">فيديو</div>
                 </div>
-                <div className="px-3">
-                  <div className="text-xl sm:text-2xl font-black text-emerald-400">
+                <div className="px-2.5">
+                  <div className="text-base sm:text-xl font-black text-emerald-400">
                     {getSubjectDuration(activeSubject)}
                   </div>
-                  <div className="text-[10px] text-slate-400 font-sans">إجمالي الساعات</div>
+                  <div className="text-[10px] text-slate-400 font-sans">المدة</div>
                 </div>
               </div>
             </div>

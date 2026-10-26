@@ -14,7 +14,8 @@ import {
   BookOpen, 
   CheckCircle2, 
   X,
-  Upload
+  Upload,
+  Sparkles
 } from 'lucide-react';
 import { LibraryFolderItem, LibraryFileItem } from '../../types';
 import { ConfirmationDialog } from '../Common/ConfirmationDialog';
@@ -48,7 +49,9 @@ export const LibraryView: React.FC = () => {
   const [newFileTitle, setNewFileTitle] = useState('');
   const [newFileType, setNewFileType] = useState<LibraryFileItem['fileType']>('تفريغ / نوطة');
   const [newFileAuthor, setNewFileAuthor] = useState('');
-  const [newFileSize, setNewFileSize] = useState('8.4 MB');
+  const [newFileSize, setNewFileSize] = useState('تلقائي');
+  const [newFilePages, setNewFilePages] = useState<number>(32);
+  const [detectedFormat, setDetectedFormat] = useState<string>('PDF');
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const deviceFileInputRef = React.useRef<HTMLInputElement | null>(null);

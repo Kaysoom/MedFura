@@ -1200,9 +1200,9 @@ export const AutomationBankView: React.FC = () => {
     };
 
     return (
-      <div className="max-w-md mx-auto sm:max-w-2xl lg:max-w-3xl px-3 sm:px-4 py-3 sm:py-4 space-y-4 pb-24">
+      <div className="w-full max-w-md mx-auto sm:max-w-2xl lg:max-w-3xl px-3 sm:px-4 py-3 sm:py-4 space-y-3.5 pb-24 overflow-x-hidden">
         {/* Header Breadcrumb (Statistics confined strictly inside StatCircleButton) */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800 gap-2">
+        <div className="flex flex-wrap items-center justify-between pb-2.5 border-b border-slate-800 gap-2">
           <button
             type="button"
             onClick={() => {
@@ -1210,18 +1210,18 @@ export const AutomationBankView: React.FC = () => {
               setChapterTempChoices({});
               setIsFilterPopoverOpen(false);
             }}
-            className="p-2 rounded-xl bg-[#131D2E] text-slate-300 hover:text-white flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer shrink-0 border border-slate-800"
+            className="px-2.5 py-1.5 rounded-xl bg-[#131D2E] text-slate-300 hover:text-white flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer shrink-0 border border-slate-800"
           >
             <ChevronRight className="w-4 h-4" />
             <span>العودة للمقرر</span>
           </button>
 
-          <div className="text-right flex-1 px-1">
-            <h2 className="text-sm sm:text-lg font-black text-white line-clamp-1">
+          <div className="text-right flex-1 min-w-0 px-1">
+            <h2 className="text-xs sm:text-base font-black text-white line-clamp-1">
               {streamTitle}
             </h2>
-            <span className="text-[11px] text-slate-400">
-              {activeSubject.name} · اضغط الدائرة لعرض الإحصائيات
+            <span className="text-[10px] sm:text-[11px] text-slate-400 block truncate">
+              {activeSubject.name} · اضغط الدائرة للإحصائيات
             </span>
           </div>
 
@@ -1249,10 +1249,10 @@ export const AutomationBankView: React.FC = () => {
                     setBulkImportChapterId(selectedChapterId);
                     setIsBulkImportModalOpen(true);
                   }}
-                  className="p-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
+                  className="p-1.5 sm:p-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
                   title="استيراد دفعي ذكي بالرموز (/q)"
                 >
-                  <FileCode2 className="w-4 h-4" />
+                  <FileCode2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">استيراد دفعي (/q)</span>
                 </button>
                 <button
@@ -1262,9 +1262,9 @@ export const AutomationBankView: React.FC = () => {
                     setQuestionToEdit(null);
                     setIsQuestionModalOpen(true);
                   }}
-                  className="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
+                  className="p-1.5 sm:p-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">سؤال جديد</span>
                 </button>
               </>
@@ -2163,92 +2163,94 @@ export const AutomationBankView: React.FC = () => {
       });
 
     return (
-      <div className="max-w-md mx-auto sm:max-w-2xl lg:max-w-3xl px-4 py-4 space-y-4">
+      <div className="w-full max-w-md mx-auto sm:max-w-2xl lg:max-w-3xl px-3.5 py-3.5 space-y-3.5 overflow-x-hidden">
         {/* Header Breadcrumb */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800 gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedSubjectId(null);
-              setSubjectSubTab('chapters');
-            }}
-            className="p-2 rounded-xl bg-[#131D2E] border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer shrink-0"
-          >
-            <ChevronRight className="w-4 h-4" />
-            <span>المواد</span>
-          </button>
-
-          <div className="flex items-center gap-2.5 text-right flex-1 px-1 justify-end min-w-0">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-base sm:text-xl font-black text-white line-clamp-1">
-                {activeSubject.name}
-              </h2>
-              <span className="text-xs text-slate-400 block truncate">{activeSubject.department}</span>
-            </div>
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-white/5"
-              style={{
-                backgroundColor: `${resolveSubjectMedicalIcon(activeSubject).accentColor}20`,
-                color: resolveSubjectMedicalIcon(activeSubject).accentColor,
+        <div className="space-y-2 pb-2.5 border-b border-slate-800">
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedSubjectId(null);
+                setSubjectSubTab('chapters');
               }}
+              className="px-2.5 py-1.5 rounded-xl bg-[#131D2E] border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer shrink-0"
             >
-              <SubjectMedicalIcon subject={activeSubject} className="w-5 h-5" />
+              <ChevronRight className="w-4 h-4" />
+              <span>المواد</span>
+            </button>
+
+            <div className="flex items-center gap-2 text-right flex-1 px-1 justify-end min-w-0">
+              <div className="min-w-0 flex-1">
+                <h2 className="text-sm sm:text-lg font-black text-white line-clamp-1">
+                  {activeSubject.name}
+                </h2>
+                <span className="text-[11px] text-slate-400 block truncate">{activeSubject.department}</span>
+              </div>
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border border-white/5"
+                style={{
+                  backgroundColor: `${resolveSubjectMedicalIcon(activeSubject).accentColor}20`,
+                  color: resolveSubjectMedicalIcon(activeSubject).accentColor,
+                }}
+              >
+                <SubjectMedicalIcon subject={activeSubject} className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <StatCircleButton
+                stats={subjectStats}
+                title={`إحصائيات مادة ${activeSubject.name}`}
+                onClick={() =>
+                  setStatsModalConfig({
+                    isOpen: true,
+                    title: `إحصائيات مادة ${activeSubject.name}`,
+                    subtitle: `${chaptersList.length} أقسام ومحاضرات`,
+                    stats: subjectStats,
+                    questionIds: subjectQuestionsAll.map(q => q.id),
+                  })
+                }
+              />
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            <StatCircleButton
-              stats={subjectStats}
-              title={`إحصائيات مادة ${activeSubject.name}`}
-              onClick={() =>
-                setStatsModalConfig({
-                  isOpen: true,
-                  title: `إحصائيات مادة ${activeSubject.name}`,
-                  subtitle: `${chaptersList.length} أقسام ومحاضرات`,
-                  stats: subjectStats,
-                  questionIds: subjectQuestionsAll.map(q => q.id),
-                })
-              }
-            />
-
-            {isAdmin && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBulkImportSubjectId(activeSubject.id);
-                    setBulkImportChapterId(activeSubject.chapters?.[0]?.id || null);
-                    setIsBulkImportModalOpen(true);
-                  }}
-                  className="p-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
-                  title="استيراد دفعي ذكي بالرموز (/q)"
-                >
-                  <FileCode2 className="w-4 h-4" />
-                  <span className="hidden sm:inline">استيراد دفعي (/q)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModalTargetSubjectId(activeSubject.id);
-                    setQuestionToEdit(null);
-                    setIsQuestionModalOpen(true);
-                  }}
-                  className="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span className="hidden sm:inline">سؤال جديد</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsAddingChapter(true)}
-                  className="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span className="hidden sm:inline">إضافة قسم</span>
-                </button>
-              </>
-            )}
-          </div>
+          {isAdmin && (
+            <div className="flex items-center justify-end gap-1.5 flex-wrap pt-0.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setBulkImportSubjectId(activeSubject.id);
+                  setBulkImportChapterId(activeSubject.chapters?.[0]?.id || null);
+                  setIsBulkImportModalOpen(true);
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                title="استيراد دفعي ذكي بالرموز (/q)"
+              >
+                <FileCode2 className="w-3.5 h-3.5" />
+                <span>استيراد دفعي (/q)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalTargetSubjectId(activeSubject.id);
+                  setQuestionToEdit(null);
+                  setIsQuestionModalOpen(true);
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>سؤال جديد</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAddingChapter(true)}
+                className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>إضافة قسم</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Sub-Tabs Inside Subject: 1. أقسام ومحاضرات المادة | 2. إحصائيات المادة */}
@@ -2777,9 +2779,9 @@ export const AutomationBankView: React.FC = () => {
         key={ch.id}
         className={`${cardSurfaceClass} hover:bg-[#162238] border ${
           isPinned ? 'border-amber-500/40' : ''
-        } rounded-2xl p-3.5 sm:p-4 transition-all flex items-center justify-between gap-3`}
+        } rounded-2xl p-2.5 sm:p-3.5 transition-all flex items-center justify-between gap-2 min-w-0`}
       >
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
           {isAdmin && (
             <div className="flex items-center gap-1">
               <button
@@ -2793,7 +2795,7 @@ export const AutomationBankView: React.FC = () => {
                 title="تعديل القسم"
                 aria-label={`تعديل القسم ${ch.name}`}
               >
-                <Edit3 className="w-3.5 h-3.5" />
+                <Edit3 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </button>
               <button
                 type="button"
@@ -2809,7 +2811,7 @@ export const AutomationBankView: React.FC = () => {
                 title="حذف القسم"
                 aria-label={`حذف القسم ${ch.name}`}
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </button>
             </div>
           )}
@@ -2818,7 +2820,7 @@ export const AutomationBankView: React.FC = () => {
           <button
             type="button"
             onClick={(e) => togglePinChapter(ch.id, e)}
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-colors cursor-pointer ${
+            className={`w-8 h-8 rounded-xl border flex items-center justify-center transition-colors cursor-pointer ${
               isPinned
                 ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
                 : 'bg-[#0E172A]/80 border-slate-700/80 text-slate-400 hover:text-white'
@@ -2826,11 +2828,12 @@ export const AutomationBankView: React.FC = () => {
             title={isPinned ? 'إلغاء تثبيت القسم من الأعلى' : 'تثبيت هذا القسم في أعلى القائمة'}
             aria-label={isPinned ? 'إلغاء تثبيت القسم' : 'تثبيت القسم'}
           >
-            <Pin className={`w-3.5 h-3.5 ${isPinned ? 'fill-amber-400' : ''}`} />
+            <Pin className={`w-3 h-3 ${isPinned ? 'fill-amber-400' : ''}`} />
           </button>
 
-          {/* Interactive Circular Statistical Icon beside every section/chapter (holds ALL chapter statistics) */}
+          {/* Interactive Circular Statistical Icon beside every section/chapter */}
           <StatCircleButton
+            size="sm"
             stats={chStats}
             title={`إحصائيات ${ch.name}`}
             onClick={() =>
@@ -2848,23 +2851,23 @@ export const AutomationBankView: React.FC = () => {
           <button
             type="button"
             onClick={() => handleOpenChapter(ch)}
-            className="flex items-center gap-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer shadow-xs whitespace-nowrap"
+            className="flex items-center gap-0.5 px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold cursor-pointer shadow-xs whitespace-nowrap"
           >
             <span>{chStats.solvedCount > 0 ? 'متابعة' : 'بدء'}</span>
-            <ChevronLeft className="w-3.5 h-3.5" />
+            <ChevronLeft className="w-3 h-3" />
           </button>
         </div>
 
-        <div className="text-right flex-1 min-w-0 pr-1">
+        <div className="text-right flex-1 min-w-0 pr-0.5">
           {renamingChapterId === ch.id ? (
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
               <input
                 type="text"
                 value={renamedChapterName}
                 onChange={(e) => setRenamedChapterName(e.target.value)}
-                className="px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
+                className="px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white w-full sm:w-auto"
               />
-              <div className="w-36">
+              <div className="w-32">
                 <InAppSelect<ChapterCategory>
                   value={renamedChapterCategory}
                   onChange={(val) => setRenamedChapterCategory(val)}
@@ -2880,14 +2883,14 @@ export const AutomationBankView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleRenameChapterSubmit(ch.id)}
-                className="px-2.5 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg cursor-pointer"
+                className="px-2.5 py-1 bg-emerald-600 text-white text-xs font-bold rounded-lg cursor-pointer"
               >
                 حفظ
               </button>
               <button
                 type="button"
                 onClick={() => setRenamingChapterId(null)}
-                className="px-2 py-1.5 bg-slate-800 text-slate-300 text-xs rounded-lg cursor-pointer"
+                className="px-2 py-1 bg-slate-800 text-slate-300 text-xs rounded-lg cursor-pointer"
               >
                 إلغاء
               </button>
@@ -2895,16 +2898,16 @@ export const AutomationBankView: React.FC = () => {
           ) : (
             <div
               onClick={() => handleOpenChapter(ch)}
-              className="flex items-center justify-end gap-2.5 cursor-pointer"
+              className="flex items-center justify-end gap-2 cursor-pointer min-w-0"
             >
               <div className="space-y-0.5 min-w-0 flex-1">
-                <h4 className="font-bold text-xs sm:text-base text-white hover:text-emerald-400 transition-colors leading-snug">
+                <h4 className="font-bold text-xs sm:text-sm text-white hover:text-emerald-400 transition-colors leading-snug line-clamp-2 break-words">
                   {ch.name}
                 </h4>
-                <div className="flex items-center justify-end gap-1.5 text-[11px] text-slate-400">
+                <div className="flex items-center justify-end gap-1 text-[10px] text-slate-400">
                   {isPinned && (
                     <>
-                      <span className="text-amber-400 font-bold">مثبت بالأعلى</span>
+                      <span className="text-amber-400 font-bold">مثبت</span>
                       <span aria-hidden="true">·</span>
                     </>
                   )}
@@ -2912,7 +2915,7 @@ export const AutomationBankView: React.FC = () => {
                 </div>
               </div>
 
-              <span className="w-7 h-7 rounded-xl bg-slate-800/80 border border-slate-700/70 flex items-center justify-center text-[11px] font-black text-emerald-400 tabular-nums shrink-0">
+              <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-slate-800/80 border border-slate-700/70 flex items-center justify-center text-[10px] sm:text-[11px] font-black text-emerald-400 tabular-nums shrink-0">
                 {String(index + 1).padStart(2, '0')}
               </span>
             </div>
@@ -2926,7 +2929,7 @@ export const AutomationBankView: React.FC = () => {
   // LEVEL 1: Main Automation Hub Tabs
   // ==========================================
   return (
-    <div className="max-w-md mx-auto sm:max-w-2xl lg:max-w-3xl px-4 py-4 space-y-5">
+    <div className="w-full max-w-md mx-auto sm:max-w-2xl lg:max-w-3xl px-3.5 py-3.5 space-y-4 overflow-x-hidden">
       {/* Top Header */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-800">
         <button

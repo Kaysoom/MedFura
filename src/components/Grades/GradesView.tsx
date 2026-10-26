@@ -437,44 +437,44 @@ export const GradesView: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 text-right selection:bg-indigo-500 selection:text-white">
+    <div className="w-full max-w-md mx-auto sm:max-w-3xl lg:max-w-4xl px-3.5 py-3.5 space-y-4 text-right selection:bg-indigo-500 selection:text-white overflow-x-hidden">
       
       {/* Success Notification Toast */}
       {appealSuccessToast && (
-        <div className="fixed bottom-6 left-6 z-50 bg-slate-900 border border-emerald-500/50 text-white p-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom duration-300">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+        <div className="fixed bottom-6 left-6 z-50 bg-slate-900 border border-emerald-500/50 text-white p-3.5 rounded-2xl shadow-2xl flex items-center gap-2.5 animate-in slide-in-from-bottom duration-300">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span className="text-xs font-bold">{appealSuccessToast}</span>
         </div>
       )}
 
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-indigo-700 via-sky-700 to-indigo-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-xs font-bold text-sky-100">
+      {/* Compact Header Banner */}
+      <div className="bg-gradient-to-r from-indigo-700 via-sky-700 to-indigo-900 text-white p-4 sm:p-6 rounded-2xl shadow-lg space-y-3">
+        <div className="space-y-1.5">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/15 text-[11px] font-bold text-sky-100">
             <Award className="w-3.5 h-3.5" />
             <span>نظام العلامات والترتيب المئوي الأكاديمي</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black">
+          <h1 className="text-base sm:text-2xl font-black leading-snug">
             كشف الدرجات والترتيب العام على الدفعة
           </h1>
-          <p className="text-xs sm:text-sm text-sky-100 max-w-xl leading-relaxed">
-            نظام مئوي دقيق خالص (/100) دون نظام الساعات أو نقاط GPA 4.0، مع جدول إدخال التحضيرية ونظام الترتيب المزدوج (مع وبدون تحضيري).
+          <p className="text-[11px] sm:text-xs text-sky-100 max-w-xl leading-relaxed">
+            نظام مئوي دقيق (/100) مع جدول إدخال التحضيرية ونظام الترتيب المزدوج (مع وبدون تحضيري).
           </p>
         </div>
 
         {/* Supervisor Actions */}
         {isAdmin && (
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0 self-start md:self-auto">
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
             <button
               onClick={() => {
                 setAdminSubjectYear(selectedYear);
                 setAdminSubjectSemester(selectedSemester);
                 setShowAdminSubjectsModal(true);
               }}
-              className="px-4 py-2.5 rounded-2xl bg-indigo-900/80 hover:bg-indigo-950 border border-indigo-400/40 text-sky-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-md"
+              className="px-3 py-1.5 rounded-xl bg-indigo-900/80 hover:bg-indigo-950 border border-indigo-400/40 text-sky-200 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 shadow-xs"
             >
-              <BookOpen className="w-4 h-4 text-sky-300" />
-              <span>إدارة وتعديل المقررات (مشرف)</span>
+              <BookOpen className="w-3.5 h-3.5 text-sky-300" />
+              <span>إدارة المقررات</span>
             </button>
 
             <button
@@ -482,49 +482,46 @@ export const GradesView: React.FC = () => {
                 handleLoadAdminStudent();
                 setShowAdminGradesModal(true);
               }}
-              className="px-4 py-2.5 rounded-2xl bg-white text-indigo-700 hover:bg-indigo-50 text-xs font-black transition-all cursor-pointer shadow-md flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-xl bg-white text-indigo-700 hover:bg-indigo-50 text-[11px] font-black transition-all cursor-pointer shadow-xs flex items-center gap-1"
             >
-              <ShieldCheck className="w-4 h-4 text-indigo-600" />
-              <span>إدخال وتعديل علامات الطلاب (مشرف)</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+              <span>إدخال علامات الطلاب</span>
             </button>
 
             <button
               onClick={() => setShowAdminAppealsModal(true)}
-              className="relative px-4 py-2.5 rounded-2xl bg-indigo-950/80 hover:bg-indigo-950 border border-indigo-400/40 text-indigo-100 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+              className="relative px-3 py-1.5 rounded-xl bg-indigo-950/80 hover:bg-indigo-950 border border-indigo-400/40 text-indigo-100 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
             >
-              <AlertCircle className="w-4 h-4 text-amber-400" />
-              <span>صندوق بلاغات الطلاب ({gradeAppeals.filter(a => a.status === 'pending').length})</span>
-              {gradeAppeals.filter(a => a.status === 'pending').length > 0 && (
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping absolute -top-1 -right-1" />
-              )}
+              <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+              <span>بلاغات الطلاب ({gradeAppeals.filter(a => a.status === 'pending').length})</span>
             </button>
           </div>
         )}
       </div>
 
       {/* Two Main Tabs: 1. علاماتي | 2. ترتيبي على الدفعة */}
-      <div className="p-1.5 bg-slate-200 dark:bg-slate-900 rounded-3xl border border-slate-300 dark:border-slate-800 flex items-center gap-2 max-w-md mx-auto sm:mx-0">
+      <div className="p-1 bg-slate-200 dark:bg-slate-900 rounded-2xl border border-slate-300 dark:border-slate-800 flex items-center gap-1.5">
         <button
           onClick={() => setActiveTab('my_grades')}
-          className={`flex-1 py-3 px-5 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
             activeTab === 'my_grades'
-              ? 'bg-indigo-600 text-white shadow-lg'
+              ? 'bg-indigo-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <Award className="w-4 h-4" />
+          <Award className="w-3.5 h-3.5" />
           <span>1. علاماتي</span>
         </button>
 
         <button
           onClick={() => setActiveTab('leaderboard')}
-          className={`flex-1 py-3 px-5 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${
+          className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
             activeTab === 'leaderboard'
-              ? 'bg-indigo-600 text-white shadow-lg'
+              ? 'bg-indigo-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <TrendingUp className="w-4 h-4" />
+          <TrendingUp className="w-3.5 h-3.5" />
           <span>2. ترتيبي على الدفعة</span>
         </button>
       </div>
@@ -599,72 +596,67 @@ export const GradesView: React.FC = () => {
             </div>
           </div>
 
-          {/* Header Card: اسم الطالب، المعدل الفصلي، الترتيب الفصلي، والمعدل التراكمي */}
-          <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-800 text-white p-6 sm:p-7 rounded-3xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-            <div className="space-y-1.5">
-              <span className="text-xs text-emerald-100 font-bold block">
-                كشف نتائج: {studentAvailableYears.find(y => y.id === selectedYear)?.name} • {selectedSemester === 'first' ? 'الفصل الأول' : 'الفصل الثاني'}
+          {/* Compact Header Card: اسم الطالب، المعدل الفصلي، الترتيب الفصلي، والمعدل التراكمي */}
+          <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-800 text-white p-4 sm:p-5 rounded-2xl shadow-lg space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="space-y-0.5 min-w-0">
+                <span className="text-[11px] text-emerald-100 font-bold block truncate">
+                  {studentAvailableYears.find(y => y.id === selectedYear)?.name} • {selectedSemester === 'first' ? 'الفصل الأول' : 'الفصل الثاني'}
+                </span>
+                <h2 className="text-base sm:text-2xl font-black truncate">
+                  {user?.displayName || 'محمد الكيصوم'} {user?.lastName || ''}
+                </h2>
+              </div>
+              <span className="text-[11px] text-emerald-100 font-mono bg-black/20 px-2.5 py-1 rounded-xl shrink-0">
+                #{user?.examNumber || user?.studentId || '30421'}
               </span>
-              <h2 className="text-2xl sm:text-3xl font-black">
-                {user?.displayName || 'محمد الكيصوم'} {user?.lastName || ''}
-              </h2>
-              <p className="text-xs text-emerald-100 font-mono">
-                الرقم الامتحاني: {user?.examNumber || user?.studentId || '30421'} • {user?.batch || 'دفعة 30'}
-              </p>
             </div>
 
-            {/* Score Pill / Card with Dual Cumulative Switcher */}
-            <div className="flex flex-col sm:flex-row items-center gap-4 bg-white/10 backdrop-blur-md p-4 px-5 rounded-2xl border border-white/20 shrink-0 font-mono text-center">
-              
-              {/* Semester Average */}
-              <div className="border-l border-white/20 pl-4">
-                <div className="text-2xl sm:text-3xl font-black text-white">
-                  {semesterAverage.toFixed(2)}%
+            {/* Compact 3-Column Score Strip on Mobile */}
+            <div className="grid grid-cols-3 gap-2 bg-white/10 backdrop-blur-md p-2.5 sm:p-3.5 rounded-xl border border-white/20 font-mono text-center">
+              <div>
+                <div className="text-base sm:text-2xl font-black text-white">
+                  {semesterAverage.toFixed(1)}%
                 </div>
-                <div className="text-[11px] text-emerald-100 font-sans">المعدل الفصلي</div>
+                <div className="text-[10px] text-emerald-100 font-sans">المعدل الفصلي</div>
               </div>
 
-              {/* Semester Rank */}
-              <div className="border-l border-white/20 pl-4">
-                <div className="text-2xl sm:text-3xl font-black text-amber-300">
+              <div className="border-x border-white/20 px-1">
+                <div className="text-base sm:text-2xl font-black text-amber-300">
                   {semesterRank}
                 </div>
-                <div className="text-[11px] text-emerald-100 font-sans">الترتيب الفصلي</div>
+                <div className="text-[10px] text-emerald-100 font-sans">الترتيب الفصلي</div>
               </div>
 
-              {/* Cumulative Score with Toggle */}
-              <div className="pr-1 text-center space-y-1">
-                <div className="text-xl sm:text-2xl font-black text-white">
+              <div className="space-y-1">
+                <div className="text-sm sm:text-xl font-black text-white">
                   {cumulativeMode === 'without_prep' 
-                    ? `${cumulativeStats.avgWithoutPrep.toFixed(3)}%` 
-                    : `${cumulativeStats.avgWithPrep.toFixed(3)}%`}
+                    ? `${cumulativeStats.avgWithoutPrep.toFixed(2)}%` 
+                    : `${cumulativeStats.avgWithPrep.toFixed(2)}%`}
                 </div>
-                
-                {/* Toggle Buttons: بدون تحضير مع تحضيري */}
-                <div className="flex items-center gap-1 bg-black/25 p-0.5 rounded-xl text-[10px] font-sans">
+                <div className="flex items-center justify-center gap-0.5 bg-black/25 p-0.5 rounded-lg text-[9px] font-sans">
                   <button
                     onClick={() => setCumulativeMode('without_prep')}
-                    className={`px-2 py-0.5 rounded-lg font-bold transition-all cursor-pointer ${
+                    className={`px-1.5 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
                       cumulativeMode === 'without_prep'
-                        ? 'bg-white text-emerald-950 font-black shadow-xs'
-                        : 'text-emerald-100 hover:text-white'
+                        ? 'bg-white text-emerald-950 font-black'
+                        : 'text-emerald-100'
                     }`}
                   >
-                    بدون تحضيري
+                    كلي
                   </button>
                   <button
                     onClick={() => setCumulativeMode('with_prep')}
-                    className={`px-2 py-0.5 rounded-lg font-bold transition-all cursor-pointer ${
+                    className={`px-1.5 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
                       cumulativeMode === 'with_prep'
-                        ? 'bg-white text-emerald-950 font-black shadow-xs'
-                        : 'text-emerald-100 hover:text-white'
+                        ? 'bg-white text-emerald-950 font-black'
+                        : 'text-emerald-100'
                     }`}
                   >
-                    مع تحضيري
+                    +تحضيري
                   </button>
                 </div>
               </div>
-
             </div>
           </div>
 

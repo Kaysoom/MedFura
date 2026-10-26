@@ -28,7 +28,7 @@ import {
   RotateCcw,
   Download
 } from 'lucide-react';
-import { usePWAInstall, MedFurMonogramBadge } from './Common/PWAInstallPrompt';
+import { usePWAInstall } from './Common/PWAInstallPrompt';
 
 export const Header: React.FC = () => {
   const { 
@@ -97,141 +97,134 @@ export const Header: React.FC = () => {
 
   return (
     <>
-      {activeSection === 'home' ? (
-        /* Full Top Header Bar: Visible ONLY on the Home Page */
-        <header
-          className={`sticky top-0 z-40 ${
-            eyeComfortMode
-              ? darkMode
-                ? 'bg-[#171512]/95 border-amber-900/40'
-                : 'bg-[#FBF6EB]/95 border-[#DCCBB1]'
-              : darkMode
-              ? 'bg-[#0B132B]/90 border-slate-800/80'
-              : 'bg-white/95 border-slate-200'
-          } backdrop-blur-md border-b transition-colors`}
-        >
-          <div className="max-w-md mx-auto sm:max-w-3xl lg:max-w-5xl px-3 sm:px-3.5 py-2.5 flex items-center justify-between gap-1.5">
-            
-            {/* Right Side (First in RTL): 3 Horizontal Lines (☰ Menu) & MedFur Monogram Logo */}
-            <div className="flex items-center gap-1.5 min-w-0">
-              <button
-                onClick={() => setIsDrawerOpen(true)}
-                aria-label="القائمة الجانبية"
-                className="p-2 rounded-xl text-slate-200 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer shrink-0"
-                title="القائمة الجانبية (ثلاث خطوط)"
-              >
-                <Menu className="w-5 h-5 stroke-[2.2]" />
-              </button>
+      {/* Unified Compact Top Header Bar: Pure Text Brand "MedFur" without internal app icon */}
+      <header
+        className={`sticky top-0 z-40 ${
+          eyeComfortMode
+            ? darkMode
+              ? 'bg-[#171512]/95 border-amber-900/40'
+              : 'bg-[#FBF6EB]/95 border-[#DCCBB1]'
+            : darkMode
+            ? 'bg-[#0B132B]/90 border-slate-800/80'
+            : 'bg-white/95 border-slate-200'
+        } backdrop-blur-md border-b transition-colors`}
+      >
+        <div className="max-w-md mx-auto sm:max-w-3xl lg:max-w-5xl px-3 sm:px-4 py-2 flex items-center justify-between gap-1.5">
+          
+          {/* Right Side (First in RTL): 3 Horizontal Lines (☰ Menu) & Pure MedFur Text Brand */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <button
+              onClick={() => setIsDrawerOpen(true)}
+              aria-label="القائمة الجانبية"
+              className="p-1.5 sm:p-2 rounded-xl text-slate-200 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer shrink-0"
+              title="القائمة الجانبية"
+            >
+              <Menu className="w-5 h-5 stroke-[2.2]" />
+            </button>
 
+            <button
+              onClick={() => {
+                setActiveSection('home');
+                setSelectedSubjectId(null);
+                setSelectedChapterId(null);
+              }}
+              aria-label="MedFur الصفحة الأساسية"
+              className="flex items-center gap-1.5 cursor-pointer group min-w-0 px-1"
+              title="MedFur - الصفحة الرئيسية"
+            >
+              <span className="font-black text-base sm:text-lg tracking-tight bg-gradient-to-l from-emerald-400 to-sky-400 bg-clip-text text-transparent">
+                MedFur
+              </span>
+            </button>
+
+            {activeSection !== 'home' && (
               <button
                 onClick={() => {
                   setActiveSection('home');
                   setSelectedSubjectId(null);
                   setSelectedChapterId(null);
                 }}
-                aria-label="MedFur الصفحة الأساسية"
-                className="flex items-center gap-1.5 cursor-pointer group min-w-0"
-                title="MedFur - بوابة طب الفرات"
+                className="px-2 py-1 rounded-lg bg-slate-800/70 hover:bg-slate-800 border border-slate-700/70 text-[11px] font-bold text-emerald-400 flex items-center gap-1 cursor-pointer transition-colors shrink-0"
+                title="العودة إلى الصفحة الرئيسية"
               >
-                <MedFurMonogramBadge className="w-8 h-8 sm:w-9 sm:h-9 group-hover:scale-105 transition-transform" />
-                <span className="font-black text-xs sm:text-sm tracking-tight text-white hidden xs:inline truncate">
-                  MedFur
-                </span>
+                <Home className="w-3 h-3" />
+                <span>الرئيسية</span>
               </button>
-            </div>
-
-            {/* Center: Quick Role Indicator / Switcher */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                onClick={() => quickSwitchPersona(isAdmin ? 'student' : 'admin')}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
-                  isAdmin 
-                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-500 dark:text-amber-300' 
-                    : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-600 dark:text-emerald-300'
-                }`}
-                title="انقر للتبديل بين حساب المشرف والطالب"
-              >
-                {isAdmin ? <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" /> : <User className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                <span className="whitespace-nowrap">{isAdmin ? 'وضع المشرف' : 'وضع الطالب'}</span>
-              </button>
-            </div>
-
-            {/* Left Side (Last in RTL): Install App, Eye Comfort, Theme Toggle (Dark/Light) & Notification Bell */}
-            <div className="flex items-center gap-1 shrink-0">
-              {!isStandalone && (
-                <button
-                  type="button"
-                  onClick={triggerInstall}
-                  className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-400 text-[11px] font-black flex items-center gap-1 transition-colors cursor-pointer"
-                  title="تثبيت تطبيق MedFur على الهاتف أو الحاسوب"
-                  aria-label="تثبيت التطبيق"
-                >
-                  <Download className="w-3.5 h-3.5 shrink-0" />
-                  <span className="hidden sm:inline">تثبيت التطبيق</span>
-                </button>
-              )}
-
-              <button
-                onClick={toggleEyeComfortMode}
-                className={`p-2 rounded-xl transition-colors cursor-pointer flex items-center gap-1 ${
-                  eyeComfortMode
-                    ? 'bg-amber-500/25 text-amber-500 dark:text-amber-300 border border-amber-500/50 shadow-xs'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                }`}
-                title={eyeComfortMode ? 'إيقاف وضع حماية العين' : 'تفعيل وضع حماية العين (مناسب للوضع الليلي والنهاري)'}
-                aria-label="وضع حماية العين"
-              >
-                <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
-
-              <button
-                onClick={toggleDarkMode}
-                className={`p-2 rounded-xl border transition-colors cursor-pointer flex items-center gap-1 ${
-                  darkMode
-                    ? 'bg-slate-800/70 border-slate-700 text-amber-400 hover:text-amber-300'
-                    : 'bg-sky-500/15 border-sky-500/40 text-sky-600 hover:bg-sky-500/25'
-                }`}
-                title={darkMode ? 'التحويل إلى الوضع النهاري (Light Mode)' : 'التحويل إلى الوضع الليلي (Dark Mode)'}
-                aria-label="تبديل المظهر ليلي أو نهاري"
-              >
-                {darkMode ? <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" /> : <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-sky-600" />}
-              </button>
-
-              <button
-                onClick={() => {
-                  setActiveSection('announcements');
-                  setSelectedSubjectId(null);
-                  setSelectedChapterId(null);
-                }}
-                className="relative p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors cursor-pointer"
-                title="الإعلانات والتنبيهات"
-              >
-                <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-400" />
-              </button>
-            </div>
+            )}
           </div>
-        </header>
-      ) : (
-        /* Floating 3-Lines Menu Button at Top-Right when inside any section/sub-page */
-        <button
-          type="button"
-          onClick={() => setIsDrawerOpen(true)}
-          aria-label="فتح القائمة الجانبية"
-          title="القائمة الجانبية"
-          className={`fixed top-3.5 right-3.5 z-40 w-10 h-10 rounded-2xl border shadow-lg backdrop-blur-md flex items-center justify-center transition-all cursor-pointer active:scale-95 ${
-            eyeComfortMode
-              ? darkMode
-                ? 'bg-[#1C1915]/90 border-amber-800/60 text-amber-200 hover:text-white'
-                : 'bg-[#FBF6EB]/90 border-[#DCCBB1] text-slate-800'
-              : darkMode
-              ? 'bg-[#131D2E]/90 border-slate-700/80 text-slate-100 hover:border-emerald-500/50 hover:text-emerald-400 shadow-slate-950/60'
-              : 'bg-white/90 border-slate-200 text-slate-800 hover:border-emerald-500/50 shadow-slate-300/50'
-          }`}
-        >
-          <Menu className="w-5 h-5 stroke-[2.3]" />
-        </button>
-      )}
+
+          {/* Center: Quick Role Indicator / Switcher */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => quickSwitchPersona(isAdmin ? 'student' : 'admin')}
+              className={`px-2 py-1 rounded-full text-[10px] sm:text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                isAdmin 
+                  ? 'bg-amber-500/20 border-amber-500/40 text-amber-500 dark:text-amber-300' 
+                  : 'bg-emerald-500/20 border-emerald-500/40 text-emerald-600 dark:text-emerald-300'
+              }`}
+              title="انقر للتبديل بين حساب المشرف والطالب"
+            >
+              {isAdmin ? <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400 shrink-0" /> : <User className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400 shrink-0" />}
+              <span className="whitespace-nowrap">{isAdmin ? 'وضع المشرف' : 'وضع الطالب'}</span>
+            </button>
+          </div>
+
+          {/* Left Side (Last in RTL): Install App, Eye Comfort, Theme Toggle (Dark/Light) & Notification Bell */}
+          <div className="flex items-center gap-1 shrink-0">
+            {!isStandalone && (
+              <button
+                type="button"
+                onClick={triggerInstall}
+                className="px-2 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-400 text-[11px] font-black flex items-center gap-1 transition-colors cursor-pointer"
+                title="تثبيت تطبيق MedFur على الهاتف أو الحاسوب"
+                aria-label="تثبيت التطبيق"
+              >
+                <Download className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline">تثبيت التطبيق</span>
+              </button>
+            )}
+
+            <button
+              onClick={toggleEyeComfortMode}
+              className={`p-1.5 sm:p-2 rounded-xl transition-colors cursor-pointer flex items-center gap-1 ${
+                eyeComfortMode
+                  ? 'bg-amber-500/25 text-amber-500 dark:text-amber-300 border border-amber-500/50 shadow-xs'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+              }`}
+              title={eyeComfortMode ? 'إيقاف وضع حماية العين' : 'تفعيل وضع حماية العين'}
+              aria-label="وضع حماية العين"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={toggleDarkMode}
+              className={`p-1.5 sm:p-2 rounded-xl border transition-colors cursor-pointer flex items-center gap-1 ${
+                darkMode
+                  ? 'bg-slate-800/70 border-slate-700 text-amber-400 hover:text-amber-300'
+                  : 'bg-sky-500/15 border-sky-500/40 text-sky-600 hover:bg-sky-500/25'
+              }`}
+              title={darkMode ? 'التحويل إلى الوضع النهاري (Light Mode)' : 'التحويل إلى الوضع الليلي (Dark Mode)'}
+              aria-label="تبديل المظهر ليلي أو نهاري"
+            >
+              {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-sky-600" />}
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveSection('announcements');
+                setSelectedSubjectId(null);
+                setSelectedChapterId(null);
+              }}
+              className="relative p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors cursor-pointer"
+              title="الإعلانات والتنبيهات"
+            >
+              <Bell className="w-4 h-4" />
+              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            </button>
+          </div>
+        </div>
+      </header>
 
       {/* Side Drawer Menu */}
       {isDrawerOpen && (
@@ -243,30 +236,38 @@ export const Header: React.FC = () => {
           />
 
           {/* Drawer container (Right side in RTL) */}
-          <div className="relative w-full max-w-xs sm:max-w-sm bg-[#0E172A] border-l border-slate-800 h-full shadow-2xl z-10 flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200 text-slate-100">
+          <div className="relative w-full max-w-[290px] sm:max-w-sm bg-[#0E172A] border-l border-slate-800 h-full shadow-2xl z-10 flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200 text-slate-100">
             
-            {/* Top User Card & Quick Appearance / Install Strip */}
-            <div className="p-5 border-b border-slate-800/80 space-y-3.5">
+            {/* Top User Card & Quick Appearance / Install Strip (No App Icon Graphic) */}
+            <div className="p-4 border-b border-slate-800/80 space-y-3">
               <div className="flex items-center justify-between">
-                <button
-                  onClick={() => setShowSettingsModal(true)}
-                  className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                  title="الإعدادات والتبديل"
-                >
-                  <Settings className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setIsDrawerOpen(false)}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                    title="إغلاق القائمة"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setShowSettingsModal(true)}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                    title="الإعدادات والتبديل"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </button>
+                </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <h3 className="font-bold text-base text-white">
+                <div className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <span className="font-black text-xs text-emerald-400 tracking-tight">MedFur</span>
+                    <h3 className="font-bold text-sm text-white">
                       {user?.displayName || 'محمد الكيصوم'}
                     </h3>
-                    <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30 mt-1">
-                      {user?.batch || 'دفعة 30'} · MedFur
-                    </span>
                   </div>
-
-                  <MedFurMonogramBadge className="w-12 h-12" />
+                  <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30 mt-1">
+                    {user?.batch || 'دفعة 30'} · كلية الطب البشري
+                  </span>
                 </div>
               </div>
 
