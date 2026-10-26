@@ -25,8 +25,10 @@ import {
   Eye,
   Play,
   Pause,
-  RotateCcw
+  RotateCcw,
+  Download
 } from 'lucide-react';
+import { usePWAInstall, MedFurMonogramBadge } from './Common/PWAInstallPrompt';
 
 export const Header: React.FC = () => {
   const { 
@@ -43,6 +45,8 @@ export const Header: React.FC = () => {
     setSelectedChapterId,
     quickSwitchPersona
   } = useApp();
+
+  const { isStandalone, triggerInstall } = usePWAInstall();
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -106,14 +110,14 @@ export const Header: React.FC = () => {
               : 'bg-white/95 border-slate-200'
           } backdrop-blur-md border-b transition-colors`}
         >
-          <div className="max-w-md mx-auto sm:max-w-3xl lg:max-w-5xl px-3.5 py-2.5 flex items-center justify-between">
+          <div className="max-w-md mx-auto sm:max-w-3xl lg:max-w-5xl px-3 sm:px-3.5 py-2.5 flex items-center justify-between gap-1.5">
             
-            {/* Right Side (First in RTL): 3 Horizontal Lines (☰ Menu) & Home Icon */}
-            <div className="flex items-center gap-1">
+            {/* Right Side (First in RTL): 3 Horizontal Lines (☰ Menu) & MedFur Monogram Logo */}
+            <div className="flex items-center gap-1.5 min-w-0">
               <button
                 onClick={() => setIsDrawerOpen(true)}
                 aria-label="القائمة الجانبية"
-                className="p-2 rounded-xl text-slate-200 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer"
+                className="p-2 rounded-xl text-slate-200 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer shrink-0"
                 title="القائمة الجانبية (ثلاث خطوط)"
               >
                 <Menu className="w-5 h-5 stroke-[2.2]" />
@@ -125,16 +129,19 @@ export const Header: React.FC = () => {
                   setSelectedSubjectId(null);
                   setSelectedChapterId(null);
                 }}
-                aria-label="الصفحة الأساسية"
-                className="p-2 rounded-xl transition-colors cursor-pointer text-emerald-400 bg-emerald-500/15"
-                title="الصفحة الأساسية"
+                aria-label="MedFur الصفحة الأساسية"
+                className="flex items-center gap-1.5 cursor-pointer group min-w-0"
+                title="MedFur - بوابة طب الفرات"
               >
-                <Home className="w-5 h-5 stroke-[2.2]" />
+                <MedFurMonogramBadge className="w-8 h-8 sm:w-9 sm:h-9 group-hover:scale-105 transition-transform" />
+                <span className="font-black text-xs sm:text-sm tracking-tight text-white hidden xs:inline truncate">
+                  MedFur
+                </span>
               </button>
             </div>
 
             {/* Center: Quick Role Indicator / Switcher */}
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={() => quickSwitchPersona(isAdmin ? 'student' : 'admin')}
                 className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
@@ -144,13 +151,26 @@ export const Header: React.FC = () => {
                 }`}
                 title="انقر للتبديل بين حساب المشرف والطالب"
               >
-                {isAdmin ? <ShieldCheck className="w-3.5 h-3.5 text-amber-400" /> : <User className="w-3.5 h-3.5 text-emerald-400" />}
-                <span>{isAdmin ? 'وضع المشرف' : 'وضع الطالب'}</span>
+                {isAdmin ? <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" /> : <User className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
+                <span className="whitespace-nowrap">{isAdmin ? 'وضع المشرف' : 'وضع الطالب'}</span>
               </button>
             </div>
 
-            {/* Left Side (Last in RTL): Eye Comfort, Theme Toggle (Dark/Light) & Notification Bell */}
-            <div className="flex items-center gap-1">
+            {/* Left Side (Last in RTL): Install App, Eye Comfort, Theme Toggle (Dark/Light) & Notification Bell */}
+            <div className="flex items-center gap-1 shrink-0">
+              {!isStandalone && (
+                <button
+                  type="button"
+                  onClick={triggerInstall}
+                  className="px-2 sm:px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-400 text-[11px] font-black flex items-center gap-1 transition-colors cursor-pointer"
+                  title="تثبيت تطبيق MedFur على الهاتف أو الحاسوب"
+                  aria-label="تثبيت التطبيق"
+                >
+                  <Download className="w-3.5 h-3.5 shrink-0" />
+                  <span className="hidden sm:inline">تثبيت التطبيق</span>
+                </button>
+              )}
+
               <button
                 onClick={toggleEyeComfortMode}
                 className={`p-2 rounded-xl transition-colors cursor-pointer flex items-center gap-1 ${
@@ -225,8 +245,8 @@ export const Header: React.FC = () => {
           {/* Drawer container (Right side in RTL) */}
           <div className="relative w-full max-w-xs sm:max-w-sm bg-[#0E172A] border-l border-slate-800 h-full shadow-2xl z-10 flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200 text-slate-100">
             
-            {/* Top User Card */}
-            <div className="p-6 border-b border-slate-800/80">
+            {/* Top User Card & Quick Appearance / Install Strip */}
+            <div className="p-5 border-b border-slate-800/80 space-y-3.5">
               <div className="flex items-center justify-between">
                 <button
                   onClick={() => setShowSettingsModal(true)}
@@ -242,20 +262,56 @@ export const Header: React.FC = () => {
                       {user?.displayName || 'محمد الكيصوم'}
                     </h3>
                     <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30 mt-1">
-                      {user?.batch || 'دفعة 30'}
+                      {user?.batch || 'دفعة 30'} · MedFur
                     </span>
                   </div>
 
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center font-bold text-lg text-white ring-2 ring-emerald-500/40">
-                      P
-                    </div>
-                    <span className="absolute -bottom-1 -left-1 w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold border-2 border-[#0E172A]">
-                      +
-                    </span>
-                  </div>
+                  <MedFurMonogramBadge className="w-12 h-12" />
                 </div>
               </div>
+
+              {/* Global Theme & Install Quick Bar inside Drawer (Accessible from any page) */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={toggleDarkMode}
+                  className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    darkMode
+                      ? 'bg-slate-800/90 border-slate-700 text-amber-300'
+                      : 'bg-sky-500/15 border-sky-500/40 text-sky-400'
+                  }`}
+                >
+                  {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-sky-400" />}
+                  <span>{darkMode ? 'الوضع النهاري' : 'الوضع الليلي'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={toggleEyeComfortMode}
+                  className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    eyeComfortMode
+                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                      : 'bg-slate-800/90 border-slate-700 text-slate-300'
+                  }`}
+                >
+                  <Eye className="w-4 h-4 text-amber-400" />
+                  <span>{eyeComfortMode ? 'حماية العين: مفعل' : 'حماية العين'}</span>
+                </button>
+              </div>
+
+              {!isStandalone && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDrawerOpen(false);
+                    triggerInstall();
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-l from-emerald-600/25 to-sky-600/25 hover:from-emerald-600/35 hover:to-sky-600/35 border border-emerald-500/40 text-emerald-300 text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Download className="w-4 h-4 text-emerald-400" />
+                  <span>تثبيت تطبيق MedFur على الهاتف</span>
+                </button>
+              )}
             </div>
 
             {/* Menu Sections List */}
@@ -286,7 +342,7 @@ export const Header: React.FC = () => {
               })}
             </div>
 
-            {/* Bottom 3 Actions (راحة العين | تواصل | المؤقت — App Rating removed) */}
+            {/* Bottom 3 Actions (راحة العين | تواصل | المؤقت) */}
             <div className="p-4 border-t border-slate-800/80 grid grid-cols-3 gap-2 text-center text-xs text-slate-400">
               <button
                 onClick={() => {

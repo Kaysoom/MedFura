@@ -498,7 +498,14 @@ export const LibraryView: React.FC = () => {
                         </div>
 
                         <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
-                          <Folder className="w-5 h-5" />
+                          {currentFolderId !== null ? (
+                            <SubjectMedicalIcon
+                              subject={{ name: fld.name }}
+                              className="w-5 h-5"
+                            />
+                          ) : (
+                            <Folder className="w-5 h-5" />
+                          )}
                         </div>
                       </div>
                     </div>
@@ -544,10 +551,10 @@ export const LibraryView: React.FC = () => {
                   {currentFolderFiles.map((file) => (
                     <div
                       key={file.id}
-                      className="bg-[#131D2E] hover:bg-[#162238] border border-slate-800 rounded-2xl p-4 flex items-center justify-between gap-3 text-right"
+                      className="bg-[#131D2E] hover:bg-[#162238] border border-slate-800 rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-2.5 sm:gap-3 text-right min-w-0"
                     >
                       {/* Left: Download & Admin edit/delete */}
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                         {isAdmin && (
                           <>
                             <button
@@ -580,24 +587,24 @@ export const LibraryView: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleDownload(file)}
-                          className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                          className="px-3 sm:px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
                         >
-                          <Download className="w-4 h-4" />
+                          <Download className="w-4 h-4 shrink-0" />
                           <span>تحميل</span>
                         </button>
                       </div>
 
                       {/* Right: File Information */}
-                      <div className="flex items-center gap-3 text-right flex-1 pr-2">
-                        <div className="flex-1">
-                          <span className="text-purple-300 text-[10px] font-bold block mb-0.5">
+                      <div className="flex items-center gap-2.5 sm:gap-3 text-right flex-1 min-w-0 pr-1">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-purple-300 text-[10px] font-bold block mb-0.5 truncate">
                             {file.fileType}
                           </span>
-                          <h4 className="font-bold text-xs sm:text-sm text-white">
+                          <h4 className="font-bold text-xs sm:text-sm text-white break-words line-clamp-2">
                             {file.title}
                           </h4>
-                          <div className="flex items-center justify-end gap-2 text-[11px] text-slate-400 mt-1 tabular-nums">
-                            <span>{file.author}</span>
+                          <div className="flex flex-wrap items-center justify-end gap-1.5 text-[11px] text-slate-400 mt-1 tabular-nums">
+                            <span className="truncate max-w-[140px]">{file.author}</span>
                             <span aria-hidden="true">·</span>
                             <span>{file.fileSize}</span>
                             {file.pages && (
@@ -661,10 +668,10 @@ export const LibraryView: React.FC = () => {
         </div>
       )}
 
-      {/* Add / Edit File Modal (Admin) */}
+      {/* Add / Edit File Modal (Admin — Zero Manual Size Entry) */}
       {isAddFileModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-md bg-[#0E172A] border border-slate-800 rounded-3xl p-6 text-white space-y-4 shadow-2xl text-right">
+          <div className="w-full max-w-md bg-[#0E172A] border border-slate-800 rounded-3xl p-5 sm:p-6 text-white space-y-4 shadow-2xl text-right max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <h3 className="font-bold text-sm">
                 {fileToEdit ? 'تعديل بيانات الملف / النوطة' : `إضافة ملف / نوطة داخل: ${activeFolder?.name || 'المجلد'}`}
@@ -674,7 +681,7 @@ export const LibraryView: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveFileSubmit} className="space-y-3">
+            <form onSubmit={handleSaveFileSubmit} className="space-y-3.5">
               <input
                 type="file"
                 ref={deviceFileInputRef}
@@ -685,13 +692,34 @@ export const LibraryView: React.FC = () => {
 
               <div
                 onClick={() => deviceFileInputRef.current?.click()}
-                className="p-3.5 rounded-xl border border-dashed border-slate-700 hover:border-emerald-500 bg-slate-900/60 text-center cursor-pointer transition-colors space-y-1"
+                className="p-4 rounded-2xl border border-dashed border-emerald-500/40 hover:border-emerald-400 bg-slate-900/70 text-center cursor-pointer transition-colors space-y-1.5"
               >
-                <Upload className="w-5 h-5 text-emerald-400 mx-auto" />
-                <p className="text-xs font-bold text-slate-200">
+                <Upload className="w-6 h-6 text-emerald-400 mx-auto" />
+                <p className="text-xs font-bold text-slate-200 break-words">
                   {uploadedFileName ? `تم اختيار: ${uploadedFileName}` : 'انقر لرفع ملف PDF أو نوطة من جهازك'}
                 </p>
-                <p className="text-[10px] text-slate-400">سيتم استخراج العنوان والحجم تلقائياً من الملف</p>
+                <p className="text-[10px] text-emerald-300/90 font-semibold">
+                  يتم استخراج العنوان، الحجم، الصيغة، وعدد الصفحات تلقائياً فور اختيار الملف
+                </p>
+              </div>
+
+              {/* Automated Metadata Preview Card (Replaces Manual Size Input) */}
+              <div className="p-3 rounded-2xl bg-[#131D2E] border border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-1.5 tabular-nums">
+                  <span className="px-2 py-0.5 rounded-lg bg-purple-500/20 text-purple-300 font-black text-[10px]">
+                    {detectedFormat}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300 font-bold text-[11px]">
+                    {newFileSize}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-lg bg-sky-500/15 text-sky-300 font-bold text-[11px]">
+                    {newFilePages} صفحة
+                  </span>
+                </div>
+                <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>بيانات الملف المستخرجة تلقائياً</span>
+                </span>
               </div>
 
               <div>
@@ -708,10 +736,10 @@ export const LibraryView: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-400 block mb-1">
-                    نوع الملف:
+                    تصنيف الملف:
                   </label>
                   <InAppSelect<LibraryFileItem['fileType']>
                     value={newFileType}
@@ -730,28 +758,16 @@ export const LibraryView: React.FC = () => {
 
                 <div>
                   <label className="text-xs font-bold text-slate-400 block mb-1">
-                    حجم الملف:
+                    إعداد / تأليف:
                   </label>
                   <input
                     type="text"
-                    value={newFileSize}
-                    onChange={(e) => setNewFileSize(e.target.value)}
+                    placeholder="د. سامر المصري / فريق النخبة"
+                    value={newFileAuthor}
+                    onChange={(e) => setNewFileAuthor(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs font-semibold text-white focus:outline-hidden"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-400 block mb-1">
-                  إعداد / تأليف:
-                </label>
-                <input
-                  type="text"
-                  placeholder="د. سامر المصري / فريق النخبة"
-                  value={newFileAuthor}
-                  onChange={(e) => setNewFileAuthor(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs font-semibold text-white focus:outline-hidden"
-                />
               </div>
 
               <button

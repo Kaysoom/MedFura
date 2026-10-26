@@ -14,13 +14,38 @@ import {
   Trash2, 
   User, 
   CheckCircle2, 
-  Layers,
   GraduationCap,
   Edit3
 } from 'lucide-react';
 import { VideoItem, AcademicYearId, SemesterType, SubjectItem } from '../../types';
 import { ConfirmationDialog } from '../Common/ConfirmationDialog';
 import { InAppSelect } from '../Common/InAppSelect';
+import { SubjectMedicalIcon, resolveSubjectMedicalIcon } from '../Common/SubjectMedicalIcon';
+
+function formatVideoSeconds(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '35:00 دقيقة';
+  const totalSec = Math.round(seconds);
+  const hrs = Math.floor(totalSec / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  if (hrs > 0) {
+    return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')} دقيقة`;
+}
+
+function extractYouTubeInfo(rawUrl: string): { id: string; embedUrl: string; thumbnail: string } | null {
+  const match = rawUrl.match(
+    /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/
+  );
+  if (!match) return null;
+  const id = match[1];
+  return {
+    id,
+    embedUrl: `https://www.youtube.com/embed/${id}`,
+    thumbnail: `https://img.youtube.com/vi/${id}/hqdefault.jpg`,
+  };
+}
 
 export const VideosView: React.FC = () => {
   const { 
@@ -52,7 +77,8 @@ export const VideosView: React.FC = () => {
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadDoctor, setUploadDoctor] = useState('');
   const [uploadChapterName, setUploadChapterName] = useState('');
-  const [uploadDuration, setUploadDuration] = useState('35:00 دقيقة');
+  const [uploadDuration, setUploadDuration] = useState('تلقائي');
+  const [uploadedVideoSize, setUploadedVideoSize] = useState<string>('تلقائي');
   const [uploadDescription, setUploadDescription] = useState('');
   const [uploadSubjectId, setUploadSubjectId] = useState<string>('');
   const [uploadVideoUrl, setUploadVideoUrl] = useState('');
@@ -129,7 +155,7 @@ export const VideosView: React.FC = () => {
     }, 4000);
   };
 
-  // Handle device file upload for video
+  // Handle device file upload for video with automatic duration, size & frame cover capture
   const handleDeviceVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -137,10 +163,62 @@ export const VideosView: React.FC = () => {
     setIsProcessingFile(true);
     setUploadedFileName(file.name);
 
-    if (!uploadTitle.trim()) {
-      const cleanName = file.name.replace(/\.[^/.]+$/, "");
+    // 1. Auto-extract clean video title
+    const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim();
+    if (!uploadTitle.trim() || !editingVideoId) {
       setUploadTitle(cleanName);
     }
+
+    // 2. Auto-extract file size
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.max(0, Math.floor(Math.log(Math.max(1, file.size)) / Math.log(k)));
+    const formattedSize = parseFloat((file.size / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    setUploadedVideoSize(formattedSize);
+    setUploadRequiresInternet(false);
+
+    // 3. Auto-extract exact duration & capture cover thumbnail via offscreen <video> + <canvas>
+    const objectUrl = URL.createObjectURL(file);
+    const tempVideo = document.createElement('video');
+    tempVideo.preload = 'metadata';
+    tempVideo.muted = true;
+    tempVideo.playsInline = true;
+    tempVideo.src = objectUrl;
+
+    tempVideo.onloadedmetadata = () => {
+      const formattedDur = formatVideoSeconds(tempVideo.duration);
+      setUploadDuration(formattedDur);
+      const seekTarget = Math.min(2.5, Math.max(0.2, (tempVideo.duration || 2) * 0.15));
+      try {
+        tempVideo.currentTime = seekTarget;
+      } catch {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+
+    tempVideo.onseeked = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 640;
+        canvas.height = 360;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
+          const capturedCover = canvas.toDataURL('image/jpeg', 0.84);
+          if (capturedCover && capturedCover.length > 100) {
+            setUploadThumbnail(capturedCover);
+          }
+        }
+      } catch {
+        // fallback if canvas tainted
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+
+    tempVideo.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+    };
 
     const reader = new FileReader();
     reader.onload = () => {
@@ -148,7 +226,23 @@ export const VideosView: React.FC = () => {
       setUploadVideoUrl(dataUrl);
       setIsProcessingFile(false);
     };
+    reader.onerror = () => {
+      setIsProcessingFile(false);
+    };
     reader.readAsDataURL(file);
+  };
+
+  // Handle external URL input with automatic YouTube thumbnail & embed resolution
+  const handleExternalVideoUrlChange = (rawVal: string) => {
+    setUploadVideoUrl(rawVal);
+    const yt = extractYouTubeInfo(rawVal);
+    if (yt) {
+      setUploadThumbnail(yt.thumbnail);
+      setUploadedVideoSize('بث يوتيوب ذكي');
+      if (uploadDuration === 'تلقائي') {
+        setUploadDuration('شرح مصور HD');
+      }
+    }
   };
 
   const handleOpenEditVideo = (vid: VideoItem) => {
@@ -157,6 +251,7 @@ export const VideosView: React.FC = () => {
     setUploadDoctor(vid.doctorName);
     setUploadChapterName(vid.chapterName || '');
     setUploadDuration(vid.duration);
+    setUploadedVideoSize('محفوظ مسبقاً');
     setUploadDescription(vid.description || '');
     setUploadSubjectId(vid.subjectId);
     setUploadVideoUrl(vid.videoUrl);
@@ -173,15 +268,25 @@ export const VideosView: React.FC = () => {
     const targetSubId = uploadSubjectId || (activeSubject?.id || availableSubjects[0]?.id || 'sub-neuro-anat');
     const yearLabel = academicYearsList.find(y => y.id === selectedYear)?.name || 'السنة الثالثة';
 
+    const ytInfo = extractYouTubeInfo(uploadVideoUrl.trim());
+    const finalVideoUrl = ytInfo
+      ? ytInfo.embedUrl
+      : uploadVideoUrl.trim() || 'https://www.youtube.com/embed/dQw4w9WgXcQ';
+    const finalThumbnail =
+      uploadThumbnail.trim() ||
+      (ytInfo ? ytInfo.thumbnail : 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=600&q=80');
+    const finalDuration =
+      uploadDuration && uploadDuration !== 'تلقائي' ? uploadDuration.trim() : '35:00 دقيقة';
+
     if (editingVideoId) {
       await updateVideo(editingVideoId, {
         subjectId: targetSubId,
         chapterName: uploadChapterName.trim() || 'شرح المحاضرة التفاعلية',
         title: uploadTitle.trim(),
         doctorName: uploadDoctor.trim() || 'فريق التدريس السريري',
-        duration: uploadDuration.trim() || '35:00 دقيقة',
-        videoUrl: uploadVideoUrl.trim() || 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-        thumbnail: uploadThumbnail.trim() || 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=600&q=80',
+        duration: finalDuration,
+        videoUrl: finalVideoUrl,
+        thumbnail: finalThumbnail,
         description: uploadDescription.trim() || 'شرح مصور تفصيلي مرفوع للمادة.',
         requiresInternet: uploadRequiresInternet,
       });
@@ -191,9 +296,9 @@ export const VideosView: React.FC = () => {
         chapterName: uploadChapterName.trim() || 'شرح المحاضرة التفاعلية',
         title: uploadTitle.trim(),
         doctorName: uploadDoctor.trim() || 'فريق التدريس السريري',
-        duration: uploadDuration.trim() || '35:00 دقيقة',
-        videoUrl: uploadVideoUrl.trim() || 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-        thumbnail: uploadThumbnail.trim() || 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=600&q=80',
+        duration: finalDuration,
+        videoUrl: finalVideoUrl,
+        thumbnail: finalThumbnail,
         academicYear: yearLabel,
         yearId: selectedYear,
         semester: selectedSemester,
@@ -208,13 +313,16 @@ export const VideosView: React.FC = () => {
     setUploadDoctor('');
     setUploadChapterName('');
     setUploadVideoUrl('');
+    setUploadThumbnail('');
+    setUploadDuration('تلقائي');
+    setUploadedVideoSize('تلقائي');
     setUploadDescription('');
     setUploadedFileName(null);
     setIsUploadModalOpen(false);
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 text-right selection:bg-rose-500 selection:text-white">
+    <div className="w-full max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-6 text-right selection:bg-rose-500 selection:text-white overflow-x-hidden">
       
       {/* Toast Notification */}
       {downloadNotice && (
@@ -341,6 +449,7 @@ export const VideosView: React.FC = () => {
                 {availableSubjects.map((sub) => {
                   const videoCount = getSubjectVideoCount(sub);
                   const duration = getSubjectDuration(sub);
+                  const { accentColor } = resolveSubjectMedicalIcon(sub);
 
                   return (
                     <div
@@ -349,7 +458,7 @@ export const VideosView: React.FC = () => {
                         setSelectedSubjectId(sub.id);
                         setSearchQuery('');
                       }}
-                      className="group bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 hover:border-rose-500/50 hover:shadow-xl transition-all cursor-pointer flex items-center justify-between gap-4 text-right"
+                      className="group bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200 dark:border-slate-800 hover:border-rose-500/50 hover:shadow-xl transition-all cursor-pointer flex items-center justify-between gap-3.5 text-right min-w-0"
                     >
                       {/* Left Side: Chevron / Jump icon */}
                       <div className="w-9 h-9 rounded-2xl bg-slate-100 dark:bg-slate-800 group-hover:bg-rose-600 group-hover:text-white text-slate-400 flex items-center justify-center transition-colors shrink-0">
@@ -357,25 +466,29 @@ export const VideosView: React.FC = () => {
                       </div>
 
                       {/* Center Info: Name, count, hours */}
-                      <div className="flex-1 space-y-1.5">
+                      <div className="flex-1 min-w-0 space-y-1.5">
                         <h4 className="font-black text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors line-clamp-1">
                           {sub.name}
                         </h4>
                         
                         {/* Requirement Specification: تشريح عصبية • 26 فيديو • 23:12:03 */}
-                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium font-mono flex items-center gap-1.5">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium font-mono flex flex-wrap items-center justify-end gap-1.5">
                           <span>{videoCount} فيديو</span>
                           <span>•</span>
                           <span className="text-rose-600 dark:text-rose-400 font-bold">{duration}</span>
                         </p>
                       </div>
 
-                      {/* Right Side: Colorful Play Icon Container */}
+                      {/* Right Side: Minimalist Medical Subject Icon Container */}
                       <div 
-                        className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-md group-hover:scale-105 transition-transform"
-                        style={{ backgroundColor: sub.color || '#E11D48' }}
+                        className="subject-medical-badge w-13 h-13 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform border"
+                        style={{
+                          backgroundColor: `${accentColor}18`,
+                          borderColor: `${accentColor}40`,
+                          color: accentColor,
+                        }}
                       >
-                        <Play className="w-6 h-6 fill-white" />
+                        <SubjectMedicalIcon subject={sub} className="w-6 h-6 sm:w-7 sm:h-7" />
                       </div>
                     </div>
                   );
@@ -392,7 +505,7 @@ export const VideosView: React.FC = () => {
         <div className="space-y-6 animate-in fade-in duration-200">
           
           {/* Back button and path */}
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
             <button
               onClick={() => setSelectedSubjectId(null)}
               className="px-4 py-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-rose-600 hover:border-rose-400 transition-colors flex items-center gap-2 cursor-pointer shadow-xs"
@@ -409,6 +522,9 @@ export const VideosView: React.FC = () => {
                   setUploadDoctor('');
                   setUploadChapterName('');
                   setUploadVideoUrl('');
+                  setUploadThumbnail('');
+                  setUploadDuration('تلقائي');
+                  setUploadedVideoSize('تلقائي');
                   setUploadDescription('');
                   setUploadSubjectId(activeSubject?.id || '');
                   setIsUploadModalOpen(true);
@@ -423,18 +539,18 @@ export const VideosView: React.FC = () => {
 
           {/* 1. Top Bar showing Doctor's Name, Dedicated Course, Video Count & Hours */}
           {activeSubject && (
-            <div className="bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 border border-rose-500/30 p-6 rounded-3xl text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="space-y-2">
+            <div className="bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 border border-rose-500/30 p-5 sm:p-6 rounded-3xl text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-5">
+              <div className="space-y-2 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-rose-300">
                     {selectedSemester === 'first' ? 'الفصل الأول' : 'الفصل الثاني'} • {academicYearsList.find(y => y.id === selectedYear)?.name}
                   </span>
                 </div>
-                <h2 className="text-2xl sm:text-3xl font-black">
+                <h2 className="text-xl sm:text-3xl font-black break-words">
                   مرئيات مقرر {activeSubject.name}
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-300 flex items-center gap-2">
-                  <User className="w-4 h-4 text-rose-400" />
+                  <User className="w-4 h-4 text-rose-400 shrink-0" />
                   <span>
                     إشراف {activeSubject.department || 'الكادر الأكاديمي للكلية'} • الدورة النظرية والعملية المكثفة
                   </span>
@@ -460,7 +576,7 @@ export const VideosView: React.FC = () => {
           )}
 
           {/* Search within subject */}
-          <div className="relative max-w-md mr-auto">
+          <div className="relative max-w-md mr-auto w-full">
             <input
               type="text"
               placeholder="البحث في فيديوهات ومحاضرات هذا المقرر..."
@@ -483,11 +599,11 @@ export const VideosView: React.FC = () => {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
               {displayedVideos.map((vid) => (
                 <div
                   key={vid.id}
-                  className="group bg-white dark:bg-slate-900 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 hover:border-rose-500/50 hover:shadow-xl transition-all flex flex-col justify-between"
+                  className="group bg-white dark:bg-slate-900 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 hover:border-rose-500/50 hover:shadow-xl transition-all flex flex-col justify-between min-w-0"
                 >
                   {/* Thumbnail with duration badge directly on image */}
                   <div 
@@ -528,22 +644,22 @@ export const VideosView: React.FC = () => {
                   </div>
 
                   {/* Video Details */}
-                  <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
-                    <div className="space-y-2">
+                  <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-4 min-w-0">
+                    <div className="space-y-2 min-w-0">
                       <h4 
                         onClick={() => setSelectedVideo(vid)}
-                        className="font-black text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors leading-snug line-clamp-2 cursor-pointer"
+                        className="font-black text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors leading-snug line-clamp-2 cursor-pointer break-words"
                       >
                         {vid.title}
                       </h4>
 
                       <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                        <User className="w-3.5 h-3.5 text-slate-400" />
-                        <span>المحاضر: {vid.doctorName}</span>
+                        <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">المحاضر: {vid.doctorName}</span>
                       </p>
 
                       {vid.description && (
-                        <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
+                        <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed break-words">
                           {vid.description}
                         </p>
                       )}
@@ -607,8 +723,8 @@ export const VideosView: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in">
           <div className="relative w-full max-w-4xl bg-slate-900 rounded-3xl overflow-hidden border border-slate-800 shadow-2xl">
             <div className="p-4 bg-slate-800 flex items-center justify-between text-white">
-              <div className="flex items-center gap-2">
-                <span className="text-xs px-2.5 py-0.5 rounded-md bg-rose-600 font-bold">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs px-2.5 py-0.5 rounded-md bg-rose-600 font-bold shrink-0">
                   {selectedVideo.chapterName || selectedVideo.academicYear}
                 </span>
                 <h3 className="font-bold text-sm sm:text-base line-clamp-1">
@@ -617,7 +733,7 @@ export const VideosView: React.FC = () => {
               </div>
               <button
                 onClick={() => setSelectedVideo(null)}
-                className="p-1 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                className="p-1 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -667,11 +783,11 @@ export const VideosView: React.FC = () => {
       )}
 
       {/* ======================================================== */}
-      {/* SUPERVISOR VIDEO UPLOAD MODAL                            */}
+      {/* SUPERVISOR VIDEO UPLOAD MODAL (Automated Metadata)       */}
       {/* ======================================================== */}
       {isUploadModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-[#121B2F] border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl text-right max-h-[92vh] overflow-y-auto">
+          <div className="bg-[#121B2F] border border-slate-800 rounded-3xl max-w-lg w-full p-5 sm:p-6 space-y-4 shadow-2xl text-right max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <button 
                 onClick={() => setIsUploadModalOpen(false)} 
@@ -679,7 +795,7 @@ export const VideosView: React.FC = () => {
               >
                 <X className="w-5 h-5" />
               </button>
-              <h3 className="font-extrabold text-base text-white flex items-center gap-2">
+              <h3 className="font-extrabold text-sm sm:text-base text-white flex items-center gap-2">
                 <Upload className="w-5 h-5 text-rose-400" />
                 <span>{editingVideoId ? 'تعديل بيانات الفيديو الأكاديمي' : 'رفع فيديو جديد وشرح أكاديمي'}</span>
               </h3>
@@ -688,15 +804,15 @@ export const VideosView: React.FC = () => {
             <form onSubmit={handleUploadSubmit} className="space-y-4">
               
               {/* Option A: Pick Video directly from Device */}
-              <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+              <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
                     <Film className="w-4 h-4" />
-                    <span>الرفع المباشر من جهاز المشرف (هاتف أو حاسوب)</span>
+                    <span>الرفع المباشر من جهاز المشرف (استخراج تلقائي)</span>
                   </span>
                   {isProcessingFile && (
                     <span className="text-[11px] text-amber-400 font-bold animate-pulse">
-                      جاري القراءة...
+                      جاري استخراج المدة والغلاف...
                     </span>
                   )}
                 </div>
@@ -711,33 +827,67 @@ export const VideosView: React.FC = () => {
 
                 <div 
                   onClick={() => fileInputRef.current?.click()}
-                  className="p-4 rounded-xl border border-dashed border-slate-700 hover:border-rose-500 bg-slate-800/40 text-center cursor-pointer transition-colors space-y-1"
+                  className="p-4 rounded-xl border border-dashed border-rose-500/40 hover:border-rose-400 bg-slate-800/40 text-center cursor-pointer transition-colors space-y-1"
                 >
-                  <Upload className="w-6 h-6 text-slate-400 mx-auto" />
-                  <p className="text-xs font-bold text-slate-200">
+                  <Upload className="w-6 h-6 text-rose-400 mx-auto" />
+                  <p className="text-xs font-bold text-slate-200 break-words">
                     {uploadedFileName ? `تم اختيار: ${uploadedFileName}` : 'انقر لاختيار ملف فيديو من جهازك'}
                   </p>
-                  <p className="text-[10px] text-slate-400">يدعم صيغ MP4, WebM, MOV وغيرها</p>
+                  <p className="text-[10px] text-emerald-300/90 font-semibold">
+                    يتم استخراج المدة الزمنية والحجم وصورة الغلاف تلقائياً من الفيديو
+                  </p>
                 </div>
               </div>
 
               {/* Option B: Or Embed/Youtube URL */}
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">
-                  أو رابط الفيديو الخارجي (YouTube / Drive / MP4):
+                  أو الصق رابط يوتيوب / فيديو خارجي (يستخرج الغلاف تلقائياً):
                 </label>
                 <input
                   type="text"
-                  placeholder="https://www.youtube.com/embed/..."
-                  value={uploadVideoUrl}
-                  onChange={(e) => setUploadVideoUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  value={uploadVideoUrl.startsWith('data:video') ? '' : uploadVideoUrl}
+                  onChange={(e) => handleExternalVideoUrlChange(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-rose-500 text-left font-mono"
                 />
               </div>
 
+              {/* Automated Media Metadata & Cover Preview Card (Replaces Manual Duration & Thumbnail URL Inputs) */}
+              <div className="p-3.5 rounded-2xl bg-[#0E1628] border border-slate-800 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 tabular-nums">
+                    <span className="px-2.5 py-0.5 rounded-lg bg-rose-500/20 text-rose-300 font-bold text-[11px] flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      <span>المدة: {uploadDuration}</span>
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-300 font-bold text-[11px]">
+                      الحجم: {uploadedVideoSize}
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>بيانات وغلاف الفيديو المستخرجة تلقائياً</span>
+                  </span>
+                </div>
+
+                {uploadThumbnail && (
+                  <div className="relative aspect-video w-full max-h-36 rounded-xl overflow-hidden border border-slate-700 bg-slate-950">
+                    <img
+                      src={uploadThumbnail}
+                      alt="معاينة الغلاف الملتقط تلقائياً"
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/75 text-[10px] font-bold text-emerald-300">
+                      تم توليد صورة الغلاف تلقائياً ✓
+                    </span>
+                  </div>
+                )}
+              </div>
+
               {/* Title */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">عنوان الفيديو (مثال: الفصل الأول - الفيديو الأول):</label>
+                <label className="block text-xs font-bold text-slate-300 mb-1">عنوان الفيديو:</label>
                 <input
                   type="text"
                   required
@@ -748,7 +898,7 @@ export const VideosView: React.FC = () => {
                 />
               </div>
 
-              {/* Target Subject */}
+              {/* Target Subject & Lecture */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1">المادة الدراسية:</label>
@@ -775,38 +925,14 @@ export const VideosView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">اسم المحاضر / الدكتور:</label>
-                  <input
-                    type="text"
-                    placeholder="د. عصام الخوري"
-                    value={uploadDoctor}
-                    onChange={(e) => setUploadDoctor(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-rose-500 text-right"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">المدة التقديرية:</label>
-                  <input
-                    type="text"
-                    placeholder="42:15 دقيقة"
-                    value={uploadDuration}
-                    onChange={(e) => setUploadDuration(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-rose-500 text-right"
-                  />
-                </div>
-              </div>
-
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">صورة الغلاف المخصص (Thumbnail URL):</label>
+                <label className="block text-xs font-bold text-slate-300 mb-1">اسم المحاضر / الدكتور:</label>
                 <input
                   type="text"
-                  placeholder="https://images.unsplash.com/..."
-                  value={uploadThumbnail}
-                  onChange={(e) => setUploadThumbnail(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-rose-500 text-left font-mono"
+                  placeholder="د. عصام الخوري"
+                  value={uploadDoctor}
+                  onChange={(e) => setUploadDoctor(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-rose-500 text-right"
                 />
               </div>
 
@@ -820,7 +946,7 @@ export const VideosView: React.FC = () => {
                   className="rounded text-rose-500"
                 />
                 <label htmlFor="reqNet" className="cursor-pointer font-bold">
-                  إظهار مؤشر "يحتاج إنترنت" على الفيديو
+                  إظهار مؤشر &quot;يحتاج إنترنت&quot; على الفيديو
                 </label>
               </div>
 

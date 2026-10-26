@@ -61,6 +61,27 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
   const [isCreatingChapter, setIsCreatingChapter] = useState(false);
   const [newChapterName, setNewChapterName] = useState('');
   const [newChapterCategory, setNewChapterCategory] = useState<ChapterCategory>('section');
+  const [uploadedFileMeta, setUploadedFileMeta] = useState<{ name: string; size: string } | null>(null);
+  const bulkFileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  const handleBulkFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB'];
+    const i = Math.max(0, Math.floor(Math.log(Math.max(1, file.size)) / Math.log(k)));
+    const formattedSize = parseFloat((file.size / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    setUploadedFileMeta({ name: file.name, size: formattedSize });
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const content = String(reader.result || '');
+      setRawText(content);
+      setManualCorrectOverrides({});
+      setImportSuccessCount(null);
+    };
+    reader.readAsText(file, 'utf-8');
+  };
 
   // Initialize default subject & chapter when modal opens
   useEffect(() => {
@@ -473,15 +494,39 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
             </form>
           )}
 
-          {/* Raw Pasted Text Input Area */}
+          {/* Raw Pasted Text Input Area + Direct File Upload */}
           <div className="space-y-2">
+            <input
+              type="file"
+              ref={bulkFileInputRef}
+              accept=".txt,.md,.json"
+              onChange={handleBulkFileUpload}
+              className="hidden"
+            />
+
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => bulkFileInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                  <span>رفع ملف أسئلة (.txt / .json) من الجهاز</span>
+                </button>
+
+                {uploadedFileMeta && (
+                  <span className="px-2.5 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-[11px] font-bold tabular-nums">
+                    {uploadedFileMeta.name} ({uploadedFileMeta.size})
+                  </span>
+                )}
+
                 {rawText.trim().length > 0 && (
                   <button
                     type="button"
                     onClick={() => {
                       setRawText('');
+                      setUploadedFileMeta(null);
                       setManualCorrectOverrides({});
                       setImportSuccessCount(null);
                     }}
@@ -499,7 +544,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
               </div>
 
               <label className="text-xs font-black text-white">
-                الصق تكتل الأسئلة هنا (يدعم حتى 10 أسئلة أو أكثر في الرسالة الواحدة):
+                الصق تكتل الأسئلة هنا أو ارفع ملفاً (يستخرج العدد والخيارات تلقائياً):
               </label>
             </div>
 

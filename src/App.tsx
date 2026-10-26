@@ -11,6 +11,7 @@ import { GradesView } from './components/Grades/GradesView';
 import { AnnouncementsView } from './components/Announcements/AnnouncementsView';
 import { DiscussionsView } from './components/Discussions/DiscussionsView';
 import { DirectChatWidget } from './components/Chat/DirectChatWidget';
+import { PWAInstallPrompt } from './components/Common/PWAInstallPrompt';
 
 const AppContent: React.FC = () => {
   const {
@@ -124,7 +125,7 @@ const AppContent: React.FC = () => {
 
   return (
     <div
-      className={`min-h-screen flex flex-col transition-colors duration-200 selection:bg-emerald-500 selection:text-white ${rootThemeClass}`}
+      className={`min-h-screen w-full max-w-[100vw] overflow-x-hidden flex flex-col transition-colors duration-200 selection:bg-emerald-500 selection:text-white ${rootThemeClass}`}
     >
       {/* Subtle Blue-Light Protection Filter Overlay when Eye Comfort Mode is active */}
       {eyeComfortMode && (
@@ -140,7 +141,7 @@ const AppContent: React.FC = () => {
       <Header />
 
       {/* Main View Area */}
-      <main className={`flex-1 flex flex-col ${activeSection === 'discussions' ? 'h-screen overflow-hidden' : 'pb-12'}`}>
+      <main className={`flex-1 w-full max-w-full min-w-0 flex flex-col ${activeSection === 'discussions' ? 'h-screen overflow-hidden' : 'pb-16'}`}>
         {activeSection === 'home' && <HomeDashboard />}
         {activeSection === 'automation' && <AutomationBankView />}
         {activeSection === 'library' && <LibraryView />}
@@ -150,6 +151,9 @@ const AppContent: React.FC = () => {
         {activeSection === 'grades' && <GradesView />}
         {(activeSection === 'announcements' || activeSection === 'about') && <AnnouncementsView />}
       </main>
+
+      {/* Smart Dismissible Mobile & Desktop PWA Install Banner + iOS Modal */}
+      <PWAInstallPrompt />
 
       {/* Double-Back to Exit Toast Notification */}
       {showExitToast && (

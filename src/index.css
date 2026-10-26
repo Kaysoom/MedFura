@@ -391,3 +391,51 @@ html.dark.eye-comfort .text-slate-300 {
 html.dark.eye-comfort .text-slate-400 {
   color: #b5a38d !important;
 }
+
+/* =========================================================
+   4. RESPONSIVE UI & ANTI-OVERFLOW CONSTITUTION (All Phones & Foldables)
+   Prevents horizontal overflow on 320px, 375px, 414px, and foldable screens
+   ========================================================= */
+html,
+body,
+#root {
+  max-width: 100vw;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Hide scrollbars on horizontal pill/breadcrumb strips while keeping touch scroll */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Compact screen refinements for small smartphones & outer foldable screens (<= 360px) */
+@media (max-width: 360px) {
+  html {
+    font-size: 14.5px;
+  }
+}
+
+/* High-contrast adaptation for Medical Subject Icon badges in Light & Eye Comfort modes */
+html:not(.dark):not(.eye-comfort) .subject-medical-badge {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  filter: saturate(1.25) contrast(1.15);
+}
+
+html:not(.dark).eye-comfort .subject-medical-badge {
+  background-color: #f5ead6 !important;
+  border-color: #cbb490 !important;
+  filter: saturate(1.15) contrast(1.15);
+}
+

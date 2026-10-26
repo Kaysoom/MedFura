@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { X, BookOpen, Layers } from 'lucide-react';
+import { X, Layers } from 'lucide-react';
 import { SubjectItem, AcademicYearId, SemesterType, ChapterItem } from '../../types';
 import { INITIAL_YEARS } from '../../initialData';
 import { InAppSelect } from '../Common/InAppSelect';
+import {
+  SubjectMedicalIcon,
+  MEDICAL_ICON_OPTIONS,
+  resolveSubjectMedicalIcon,
+} from '../Common/SubjectMedicalIcon';
 
 interface SubjectModalProps {
   isOpen: boolean;
@@ -18,6 +23,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({ isOpen, onClose, sub
   const [yearId, setYearId] = useState<AcademicYearId>(activeYear);
   const [semester, setSemester] = useState<SemesterType>(activeSemester);
   const [department, setDepartment] = useState('');
+  const [selectedIcon, setSelectedIcon] = useState<string>('auto');
   const [chaptersInput, setChaptersInput] = useState('');
 
   useEffect(() => {
@@ -26,6 +32,8 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({ isOpen, onClose, sub
       setYearId(subjectToEdit.yearId);
       setSemester(subjectToEdit.semester);
       setDepartment(subjectToEdit.department || '');
+      const hasCustomMedicalIcon = MEDICAL_ICON_OPTIONS.some((o) => o.key === subjectToEdit.icon);
+      setSelectedIcon(hasCustomMedicalIcon && subjectToEdit.icon ? subjectToEdit.icon : 'auto');
       setChaptersInput(
         subjectToEdit.chapters
           ? subjectToEdit.chapters.map(c => (typeof c === 'string' ? c : c.name)).join('\n')
@@ -36,11 +44,20 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({ isOpen, onClose, sub
       setYearId(activeYear);
       setSemester(activeSemester);
       setDepartment('القسم الأكاديمي');
+      setSelectedIcon('auto');
       setChaptersInput('الفصل الأول: الجهاز العصبي المركزي\nالفصل الثاني: جذع الدماغ والأعصاب القحفية\nالفصل الثالث: المراجعة الشاملة');
     }
   }, [subjectToEdit, isOpen, activeYear, activeSemester]);
 
   if (!isOpen) return null;
+
+  const previewSubject = {
+    name: name || 'مادة طبية',
+    department,
+    icon: selectedIcon === 'auto' ? undefined : selectedIcon,
+    color: subjectToEdit?.color,
+  };
+  const resolvedPreview = resolveSubjectMedicalIcon(previewSubject);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,12 +78,17 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({ isOpen, onClose, sub
       })
       .filter(c => c.name.length > 0);
 
+    const finalIcon = selectedIcon === 'auto' ? resolvedPreview.iconKey : selectedIcon;
+    const finalColor = resolvedPreview.accentColor;
+
     if (subjectToEdit) {
       await updateSubject(subjectToEdit.id, {
         name: name.trim(),
         yearId,
         semester,
         department: department.trim(),
+        icon: finalIcon,
+        color: finalColor,
         chapters: parsedChapters.length > 0 ? parsedChapters : subjectToEdit.chapters,
       });
     } else {
@@ -78,7 +100,8 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({ isOpen, onClose, sub
         chapters: parsedChapters.length > 0 ? parsedChapters : [{ id: `ch-${Date.now()}-0`, name: 'الفصل الأول', category: 'section', questionsCount: 0 }],
         questionsCount: 0,
         filesCount: 0,
-        icon: 'BookOpen',
+        icon: finalIcon,
+        color: finalColor,
       });
     }
 
@@ -93,7 +116,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({ isOpen, onClose, sub
         <div className="bg-gradient-to-r from-emerald-600 to-teal-700 p-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center">
-              <BookOpen className="w-6 h-6 text-white" />
+              <SubjectMedicalIcon subject={previewSubject} className="w-6 h-6 text-white" />
             </div>
             <div>
               <h3 className="font-extrabold text-lg text-white">
@@ -115,32 +138,64 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({ isOpen, onClose, sub
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-right">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-right max-h-[80vh] overflow-y-auto">
           <div>
             <label className="block text-xs font-bold text-slate-300 mb-1">
               اسم المادة <span className="text-rose-500">*</span>
             </label>
-            <input
-              type="text"
-              required
-              placeholder="مثال: تشريح عصبية، فيزيولوجيا 3، كيمياء سريرية 2..."
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs sm:text-sm font-semibold text-white focus:outline-hidden focus:border-emerald-500"
-            />
+            <div className="flex items-center gap-2.5">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-white/10"
+                style={{
+                  backgroundColor: `${resolvedPreview.accentColor}20`,
+                  color: resolvedPreview.accentColor,
+                }}
+                title="الأيقونة الطبية للمادة"
+              >
+                <SubjectMedicalIcon subject={previewSubject} className="w-5 h-5" />
+              </div>
+              <input
+                type="text"
+                required
+                placeholder="مثال: تشريح عصبية، فيزيولوجيا 3، كيمياء سريرية 2..."
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="flex-1 px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs sm:text-sm font-semibold text-white focus:outline-hidden focus:border-emerald-500"
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-300 mb-1">
-              القسم الأكاديمي
-            </label>
-            <input
-              type="text"
-              placeholder="قسم العلوم العصبية والسريرية"
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs font-semibold text-white focus:outline-hidden focus:border-emerald-500"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                القسم الأكاديمي
+              </label>
+              <input
+                type="text"
+                placeholder="قسم العلوم العصبية والسريرية"
+                value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs font-semibold text-white focus:outline-hidden focus:border-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                الأيقونة الطبية للمادة
+              </label>
+              <InAppSelect<string>
+                value={selectedIcon}
+                onChange={(val) => setSelectedIcon(val)}
+                size="sm"
+                options={[
+                  { value: 'auto', label: 'تلقائي ذكي حسب اسم المادة' },
+                  ...MEDICAL_ICON_OPTIONS.map((opt) => ({
+                    value: opt.key,
+                    label: opt.label,
+                  })),
+                ]}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

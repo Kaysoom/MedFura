@@ -32,7 +32,7 @@ export function InAppSelect<T extends string = string>({
   icon,
   size = 'md',
   variant = 'dark',
-  inlineExpand = true,
+  inlineExpand = false,
 }: InAppSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -41,21 +41,32 @@ export function InAppSelect<T extends string = string>({
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside, { passive: true });
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen]);
 
   const sizePadding =
     size === 'sm'
-      ? 'py-1.5 px-3 text-xs rounded-xl'
+      ? 'py-1.5 px-3 text-xs rounded-xl min-h-[38px]'
       : size === 'lg'
-      ? 'py-3 px-4 text-xs sm:text-sm rounded-2xl'
-      : 'py-2.5 px-3.5 text-xs sm:text-sm rounded-xl';
+      ? 'py-3 px-4 text-xs sm:text-sm rounded-2xl min-h-[46px]'
+      : 'py-2.5 px-3.5 text-xs sm:text-sm rounded-xl min-h-[42px]';
 
   const baseTheme =
     variant === 'adaptive'
@@ -68,7 +79,7 @@ export function InAppSelect<T extends string = string>({
       : 'bg-[#0E172A] border-slate-700/90 text-white';
 
   return (
-    <div ref={containerRef} className={`relative text-right ${className}`}>
+    <div ref={containerRef} className={`relative text-right min-w-0 ${className}`}>
       <button
         type="button"
         aria-label={ariaLabel}
@@ -99,8 +110,8 @@ export function InAppSelect<T extends string = string>({
           className={`${
             inlineExpand
               ? 'mt-2 w-full'
-              : 'absolute z-50 mt-1.5 w-full right-0 shadow-2xl'
-          } rounded-2xl border p-1.5 space-y-1 max-h-64 overflow-y-auto animate-in fade-in zoom-in-95 duration-150 ${panelTheme}`}
+              : 'absolute z-[70] top-full mt-1.5 w-full right-0 left-0 shadow-2xl shadow-black/50 backdrop-blur-md'
+          } rounded-2xl border p-1.5 space-y-1 max-h-60 overflow-y-auto overscroll-contain animate-in fade-in zoom-in-95 duration-150 ${panelTheme}`}
           role="listbox"
         >
           {options.map((opt) => {

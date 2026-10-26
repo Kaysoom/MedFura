@@ -57,6 +57,7 @@ import { QuestionModal } from '../Admin/QuestionModal';
 import { BulkImportModal } from '../Admin/BulkImportModal';
 import { ConfirmationDialog } from '../Common/ConfirmationDialog';
 import { InAppSelect } from '../Common/InAppSelect';
+import { SubjectMedicalIcon, resolveSubjectMedicalIcon } from '../Common/SubjectMedicalIcon';
 import { StatCircleButton, StatsCircleModal } from './StatsCircleModal';
 import { QuestionDiscussionModal } from './QuestionDiscussionModal';
 import { ReportQuestionModal } from './ReportQuestionModal';
@@ -2177,11 +2178,22 @@ export const AutomationBankView: React.FC = () => {
             <span>المواد</span>
           </button>
 
-          <div className="text-right flex-1 px-1">
-            <h2 className="text-base sm:text-xl font-black text-white line-clamp-1">
-              {activeSubject.name}
-            </h2>
-            <span className="text-xs text-slate-400">{activeSubject.department}</span>
+          <div className="flex items-center gap-2.5 text-right flex-1 px-1 justify-end min-w-0">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base sm:text-xl font-black text-white line-clamp-1">
+                {activeSubject.name}
+              </h2>
+              <span className="text-xs text-slate-400 block truncate">{activeSubject.department}</span>
+            </div>
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-white/5"
+              style={{
+                backgroundColor: `${resolveSubjectMedicalIcon(activeSubject).accentColor}20`,
+                color: resolveSubjectMedicalIcon(activeSubject).accentColor,
+              }}
+            >
+              <SubjectMedicalIcon subject={activeSubject} className="w-5 h-5" />
+            </div>
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
@@ -2962,11 +2974,11 @@ export const AutomationBankView: React.FC = () => {
       </div>
 
       {/* Main View Tabs (5 Tabs including Supervisor Reports & Review Panel) */}
-      <div className={`grid ${isAdmin ? 'grid-cols-5' : 'grid-cols-4'} gap-1.5 p-1 bg-[#131D2E] rounded-2xl border border-slate-800 text-[11px] sm:text-xs font-bold`}>
+      <div className={`grid ${isAdmin ? 'grid-cols-5' : 'grid-cols-4'} gap-1 sm:gap-1.5 p-1 bg-[#131D2E] rounded-2xl border border-slate-800 text-[10px] sm:text-xs font-bold min-w-0`}>
         <button
           type="button"
           onClick={() => handleSwitchTab('bank')}
-          className={`py-2 rounded-xl text-center transition-all cursor-pointer whitespace-nowrap ${
+          className={`py-2 px-1 rounded-xl text-center transition-all cursor-pointer truncate ${
             activeTab === 'bank'
               ? 'bg-emerald-600 text-white shadow-xs'
               : 'text-slate-400 hover:text-white'
@@ -2978,19 +2990,19 @@ export const AutomationBankView: React.FC = () => {
         <button
           type="button"
           onClick={() => handleSwitchTab('mistakes')}
-          className={`py-2 rounded-xl text-center transition-all cursor-pointer whitespace-nowrap ${
+          className={`py-2 px-1 rounded-xl text-center transition-all cursor-pointer truncate ${
             activeTab === 'mistakes'
               ? 'bg-rose-600 text-white shadow-xs'
               : 'text-slate-400 hover:text-white'
           }`}
         >
-          بنك الأخطاء ({wrongQuestionIds.length})
+          الأخطاء ({wrongQuestionIds.length})
         </button>
 
         <button
           type="button"
           onClick={() => handleSwitchTab('saved_notes')}
-          className={`py-2 rounded-xl text-center transition-all cursor-pointer whitespace-nowrap ${
+          className={`py-2 px-1 rounded-xl text-center transition-all cursor-pointer truncate ${
             activeTab === 'saved_notes'
               ? 'bg-amber-600 text-white shadow-xs'
               : 'text-slate-400 hover:text-white'
@@ -3002,7 +3014,7 @@ export const AutomationBankView: React.FC = () => {
         <button
           type="button"
           onClick={() => handleSwitchTab('stats')}
-          className={`py-2 rounded-xl text-center transition-all cursor-pointer whitespace-nowrap ${
+          className={`py-2 px-1 rounded-xl text-center transition-all cursor-pointer truncate ${
             activeTab === 'stats'
               ? 'bg-sky-600 text-white shadow-xs'
               : 'text-slate-400 hover:text-white'
@@ -3015,14 +3027,14 @@ export const AutomationBankView: React.FC = () => {
           <button
             type="button"
             onClick={() => handleSwitchTab('reports')}
-            className={`py-2 rounded-xl text-center transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-1 ${
+            className={`py-2 px-1 rounded-xl text-center transition-all cursor-pointer truncate flex items-center justify-center gap-0.5 sm:gap-1 ${
               activeTab === 'reports'
                 ? 'bg-indigo-600 text-white shadow-xs'
                 : 'text-amber-300 hover:text-white'
             }`}
           >
-            <Flag className="w-3.5 h-3.5" />
-            <span>البلاغات ({pendingReportsCount})</span>
+            <Flag className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+            <span className="truncate">البلاغات ({pendingReportsCount})</span>
           </button>
         )}
       </div>
@@ -3128,7 +3140,7 @@ export const AutomationBankView: React.FC = () => {
 
               <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
                 <span>لوحة تحكم المشرف: إضافة وتعديل وحذف المواد والأقسام والأسئلة</span>
-                <ShieldCheck className="w-4 h-4" />
+                <ShieldCheck className="w-4 h-4 shrink-0" />
               </div>
             </div>
           )}
@@ -3146,11 +3158,11 @@ export const AutomationBankView: React.FC = () => {
                     setSelectedSubjectId(sub.id);
                     setSubjectSubTab('chapters');
                   }}
-                  className={`group ${cardSurfaceClass} hover:bg-[#162238] border hover:border-emerald-500/40 rounded-2xl p-4 transition-all duration-200 cursor-pointer flex items-center justify-between gap-3 shadow-md`}
+                  className={`group ${cardSurfaceClass} hover:bg-[#162238] border hover:border-emerald-500/40 rounded-2xl p-3.5 sm:p-4 transition-all duration-200 cursor-pointer flex items-center justify-between gap-2.5 sm:gap-3 shadow-md min-w-0`}
                 >
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                     {isAdmin && (
-                      <div className="flex items-center gap-1 mr-1" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1 mr-0.5" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
                           onClick={() => {
@@ -3202,22 +3214,27 @@ export const AutomationBankView: React.FC = () => {
                     />
                   </div>
 
-                  <div className="flex items-center gap-3 text-right flex-1 justify-end min-w-0">
+                  <div className="flex items-center gap-2.5 sm:gap-3 text-right flex-1 justify-end min-w-0">
                     <div className="space-y-0.5 min-w-0 flex-1">
                       <span className="font-black text-sm sm:text-base text-white group-hover:text-emerald-400 transition-colors block truncate">
                         {sub.name}
                       </span>
-                      <span className="text-[11px] text-slate-400 block">
+                      <span className="text-[11px] text-slate-400 block truncate">
                         {sub.chapters?.length || 0} أقسام ومحاضرات
                       </span>
                     </div>
 
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: `${sub.color || '#10B981'}20`, color: sub.color || '#10B981' }}
-                    >
-                      <BookOpen className="w-5 h-5" />
-                    </div>
+                    {(() => {
+                      const { accentColor } = resolveSubjectMedicalIcon(sub);
+                      return (
+                        <div
+                          className="subject-medical-badge w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-white/5 transition-transform group-hover:scale-105"
+                          style={{ backgroundColor: `${accentColor}20`, borderColor: `${accentColor}40`, color: accentColor }}
+                        >
+                          <SubjectMedicalIcon subject={sub} className="w-5 h-5" />
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               );
