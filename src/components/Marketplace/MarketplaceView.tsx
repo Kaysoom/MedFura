@@ -21,7 +21,8 @@ export const MarketplaceView: React.FC = () => {
   const { 
     marketplaceItems, 
     user, 
-    isAdmin, 
+    isAdmin,
+    isGuest,
     updateMarketplaceItemStatus, 
     deleteMarketplaceItem,
     openDirectChatWithUser,
@@ -82,30 +83,21 @@ export const MarketplaceView: React.FC = () => {
   };
 
   const isOwnerOrAdmin = (item: MarketplaceItem) => {
-    return isAdmin || (user && user.uid === item.sellerId);
+    return isAdmin || (user && !isGuest && user.uid === item.sellerId);
   };
 
   return (
-    <div className="w-full max-w-md mx-auto sm:max-w-3xl lg:max-w-4xl px-3.5 py-3.5 space-y-4 overflow-x-hidden">
+    <div className="w-full max-w-md mx-auto sm:max-w-3xl lg:max-w-5xl px-3 sm:px-4 py-3.5 space-y-4 overflow-x-hidden">
       
-      {/* Top Header */}
+      {/* Top Header (Click MedFur in top header to return Home) */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-800 gap-2">
-        <button
-          onClick={() => setActiveSection('home')}
-          className="p-1.5 rounded-xl text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer flex items-center gap-1 text-xs font-bold shrink-0"
-          title="العودة للرئيسية"
-        >
-          <ChevronRight className="w-4 h-4" />
-          <span>الرئيسية</span>
-        </button>
-
-        <h1 className="text-sm sm:text-lg font-black text-emerald-400 text-center truncate">
+        <h1 className="text-sm sm:text-lg font-black text-emerald-400 text-right truncate">
           سوق المستلزمات والكتب
         </h1>
 
         <button
           onClick={() => {
-            if (!user) {
+            if (!user || isGuest) {
               setIsAuthModalOpen(true);
             } else {
               setIsAddModalOpen(true);
@@ -114,7 +106,7 @@ export const MarketplaceView: React.FC = () => {
           className="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[11px] sm:text-xs flex items-center gap-1 transition-all cursor-pointer shadow-md shrink-0"
         >
           <Plus className="w-3.5 h-3.5 stroke-[3]" />
-          <span>إضافة إعلان</span>
+          <span>{isGuest ? 'دخول لإضافة إعلان' : 'إضافة إعلان'}</span>
         </button>
       </div>
 

@@ -42,6 +42,8 @@ import {
   Shuffle,
   Brain,
   FileCode2,
+  Palette,
+  Download,
 } from 'lucide-react';
 import {
   SubjectItem,
@@ -64,15 +66,31 @@ import { ReportQuestionModal } from './ReportQuestionModal';
 import { AITutorModal } from './AITutorModal';
 import { GeminiContextChatModal } from './GeminiContextChatModal';
 import { SupervisorReportsPanel } from './SupervisorReportsPanel';
+import { MyQuizzesPanel } from './MyQuizzesPanel';
 import {
   computeQuestionStats,
   processOptionClick,
   SolvedEntry,
   QuestionStatsSummary,
 } from '../../utils/automationLogic';
+import {
+  getDensityLayoutClasses,
+  resolveOptionClickWithPreferences,
+  playQuizFeedbackTone,
+} from '../../utils/settingsAndDensityLogic';
+import {
+  buildOfflineAutomationPack,
+  loadOfflineAutomationStatus,
+  saveOfflineAutomationPackToStorage,
+  OfflineAutomationStatusMap,
+} from '../../utils/mediaAndOfflineLogic';
 import confetti from 'canvas-confetti';
 
-export const AutomationBankView: React.FC = () => {
+interface AutomationBankViewProps {
+  initialTab?: 'bank' | 'mistakes' | 'saved_notes' | 'stats' | 'reports';
+}
+
+export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialTab }) => {
   const {
     subjects,
     questions,
@@ -95,8 +113,12 @@ export const AutomationBankView: React.FC = () => {
     toggleDarkMode,
     eyeComfortMode,
     toggleEyeComfortMode,
+    colorTheme,
+    setColorTheme,
     questionFontScale,
     setQuestionFontScale,
+    uiDensity,
+    quizPreferences,
     savedQuestionIds,
     toggleSaveQuestion,
     questionNotes,
@@ -112,16 +134,27 @@ export const AutomationBankView: React.FC = () => {
     questionComments,
     deleteQuestionComment,
     questionReports,
+    studentCustomQuizzes,
   } = useApp();
 
   // Top Tabs: 'bank' | 'mistakes' | 'saved_notes' | 'stats' | 'reports'
-  const [activeTab, setActiveTab] = useState<'bank' | 'mistakes' | 'saved_notes' | 'stats' | 'reports'>('bank');
+  const [activeTab, setActiveTab] = useState<'bank' | 'mistakes' | 'saved_notes' | 'stats' | 'reports'>(
+    initialTab || 'bank'
+  );
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Inside Subject Sub-tab: 'chapters' | 'subject_stats'
   const [subjectSubTab, setSubjectSubTab] = useState<'chapters' | 'subject_stats'>('chapters');
 
-  // Inside Subject Chapters Organization: Category Tabs (3 tabs: الأقسام | المحاضرات | شامل وجزئي), Search, Status Filter, Pinned Chapters & Last Visited Chapter
-  const [activeChapterCategoryTab, setActiveChapterCategoryTab] = useState<'section' | 'lecture' | 'comprehensive_partial'>('section');
+  // Inside Subject Chapters Organization: Category Tabs (4 tabs: الأقسام | المحاضرات | شامل وجزئي | اختباراتي)
+  const [activeChapterCategoryTab, setActiveChapterCategoryTab] = useState<
+    'section' | 'lecture' | 'comprehensive_partial' | 'my_quizzes'
+  >('section');
   const [chapterListSearch, setChapterListSearch] = useState('');
   const [chapterStatusFilter, setChapterStatusFilter] = useState<'all' | 'in_progress' | 'completed' | 'not_started'>('all');
 
@@ -148,6 +181,7 @@ export const AutomationBankView: React.FC = () => {
   const [customQuizSelectedChapterIds, setCustomQuizSelectedChapterIds] = useState<string[]>([]);
   const [customQuizQuestionLimit, setCustomQuizQuestionLimit] = useState<number | 'all'>(15);
   const [customQuizQuestionIds, setCustomQuizQuestionIds] = useState<string[]>([]);
+  const [activeCustomQuizTitle, setActiveCustomQuizTitle] = useState<string | null>(null);
 
   // Chapter Stream Filter: 'all' | 'unsolved' | 'wrong' | 'saved'
   const [chapterStreamFilter, setChapterStreamFilter] = useState<'all' | 'unsolved' | 'wrong' | 'saved'>('all');
@@ -244,6 +278,37 @@ export const AutomationBankView: React.FC = () => {
 
   // Saved / Notes Sub-tab: 'saved' | 'notes'
   const [savedNotesSubTab, setSavedNotesSubTab] = useState<'saved' | 'notes'>('saved');
+
+  // Offline Automation Pack Download State
+  const [offlineAutoStatus, setOfflineAutoStatus] = useState<OfflineAutomationStatusMap>(() =>
+    loadOfflineAutomationStatus()
+  );
+  const [offlineAutoNotice, setOfflineAutoNotice] = useState<string | null>(null);
+
+  const handleDownloadAutomationOffline = (scope: 'all' | 'subject', subjectId?: string) => {
+    const pack = buildOfflineAutomationPack({
+      scope,
+      subjects,
+      questions,
+      targetSubjectId: subjectId,
+    });
+    const updatedStatus = saveOfflineAutomationPackToStorage(pack);
+    setOfflineAutoStatus(updatedStatus);
+
+    if (scope === 'all') {
+      setOfflineAutoNotice(
+        `تم تنزيل وحفظ كامل بنك الأتمتة (${pack.questionsCount} سؤال في ${pack.subjectsCount} مواد) للعمل بدون إنترنت بنجاح ✓`
+      );
+    } else {
+      const subName = subjects.find((s) => s.id === subjectId)?.name || 'المادة';
+      setOfflineAutoNotice(
+        `تم تنزيل وحفظ جميع أسئلة أتمتة «${subName}» (${pack.questionsCount} سؤال) للعمل بدون إنترنت ✓`
+      );
+    }
+    setTimeout(() => {
+      setOfflineAutoNotice(null);
+    }, 4000);
+  };
 
   // Local Session State for Mistakes Bank (questions start unsolved; correct ones are synced to chapter immediately and removed from Mistakes Bank on exit)
   const [mistakesTempChoice, setMistakesTempChoice] = useState<Record<string, number | null>>({});
@@ -563,24 +628,63 @@ export const AutomationBankView: React.FC = () => {
     ? 'bg-[#1C1915] border-amber-900/40'
     : 'bg-[#131D2E] border-slate-800';
 
+  const density = getDensityLayoutClasses(uiDensity);
+
+  const finalizeQuestionConfirmation = (question: QuestionItem, chosenOption: number) => {
+    const isCorrect = chosenOption === question.correctOptionIndex;
+    recordQuestionAnswer(question.id, chosenOption, isCorrect);
+    setLastSolvedQuestionId(question.id);
+    setChapterTempChoices(prev => ({ ...prev, [question.id]: null }));
+
+    // Apply autoExpandExplanation preference
+    setCollapsedExplanations(prev => ({
+      ...prev,
+      [question.id]: !quizPreferences.autoExpandExplanation,
+    }));
+
+    // Play interactive audio tone if enabled
+    playQuizFeedbackTone(isCorrect, quizPreferences.soundEffects);
+
+    if (isCorrect) {
+      triggerCelebration();
+      // Auto-advance to the next question in the current filtered stream if enabled
+      if (quizPreferences.autoAdvanceOnCorrect) {
+        const currentIdx = filteredChapterQuestions.findIndex(item => item.id === question.id);
+        const nextQ = currentIdx >= 0 ? filteredChapterQuestions[currentIdx + 1] : undefined;
+        if (nextQ) {
+          setTimeout(() => {
+            const nextEl = questionCardRefs.current[nextQ.id];
+            if (nextEl) {
+              nextEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              setHighlightedQuestionId(nextQ.id);
+              setTimeout(() => {
+                setHighlightedQuestionId(prev => (prev === nextQ.id ? null : prev));
+              }, 1400);
+            }
+          }, 380);
+        }
+      }
+    }
+  };
+
   // ========================================================
-  // Dual-Verification in Chapter Vertical Stream Mode:
-  // 1st click -> Blue selection
-  // 2nd click on same option -> Confirm & check answer (Green/Red)
+  // Option Click in Chapter Vertical Stream Mode:
+  // Supports both 2-click confirmation ('double') and instant 1-click ('single') via quizPreferences
   // ========================================================
   const handleStreamOptionClick = (question: QuestionItem, optionIdx: number) => {
     const alreadyConfirmed = solvedQuestions[question.id] !== undefined;
     const currentTemp = chapterTempChoices[question.id] ?? null;
-    const result = processOptionClick(currentTemp, optionIdx, alreadyConfirmed);
+    const result = resolveOptionClickWithPreferences(
+      currentTemp,
+      optionIdx,
+      alreadyConfirmed,
+      quizPreferences.confirmMode
+    );
 
     if (result.action === 'select') {
       setChapterTempChoices(prev => ({ ...prev, [question.id]: result.nextTempChoice }));
     } else if (result.action === 'confirm') {
-      const isCorrect = result.chosenOption === question.correctOptionIndex;
-      recordQuestionAnswer(question.id, result.chosenOption, isCorrect);
-      setLastSolvedQuestionId(question.id);
-      setChapterTempChoices(prev => ({ ...prev, [question.id]: null }));
-      if (isCorrect) triggerCelebration();
+      finalizeQuestionConfirmation(question, result.chosenOption);
     }
   };
 
@@ -588,11 +692,7 @@ export const AutomationBankView: React.FC = () => {
   const handleStreamConfirmButton = (question: QuestionItem) => {
     const chosen = chapterTempChoices[question.id];
     if (chosen === null || chosen === undefined) return;
-    const isCorrect = chosen === question.correctOptionIndex;
-    recordQuestionAnswer(question.id, chosen, isCorrect);
-    setLastSolvedQuestionId(question.id);
-    setChapterTempChoices(prev => ({ ...prev, [question.id]: null }));
-    if (isCorrect) triggerCelebration();
+    finalizeQuestionConfirmation(question, chosen);
   };
 
   // Dual-Verification inside Mistakes Bank & Saved Questions interactive cards
@@ -611,7 +711,12 @@ export const AutomationBankView: React.FC = () => {
 
     const alreadySolved = solvedMap[question.id] !== undefined;
     const currentTemp = tempMap[question.id] ?? null;
-    const result = processOptionClick(currentTemp, optionIdx, alreadySolved);
+    const result = resolveOptionClickWithPreferences(
+      currentTemp,
+      optionIdx,
+      alreadySolved,
+      quizPreferences.confirmMode
+    );
 
     if (result.action === 'select') {
       setTempMap(prev => ({ ...prev, [question.id]: result.nextTempChoice }));
@@ -622,6 +727,7 @@ export const AutomationBankView: React.FC = () => {
         [question.id]: { chosenOption: result.chosenOption, isCorrect },
       }));
       setTempMap(prev => ({ ...prev, [question.id]: null }));
+      playQuizFeedbackTone(isCorrect, quizPreferences.soundEffects);
       if (mode === 'mistakes' && isCorrect) {
         recordQuestionAnswer(question.id, result.chosenOption, true);
       }
@@ -726,6 +832,7 @@ export const AutomationBankView: React.FC = () => {
         : shuffled.slice(0, customQuizQuestionLimit);
 
     setCustomQuizQuestionIds(finalQuestions.map(q => q.id));
+    setActiveCustomQuizTitle(null);
     setIsCustomQuizModalOpen(false);
     setSelectedChapterId('__custom_quiz__');
     setChapterStreamFilter('all');
@@ -1184,7 +1291,9 @@ export const AutomationBankView: React.FC = () => {
       ? null
       : activeSubject.chapters?.find(c => c.id === selectedChapterId);
     const streamTitle = isCustomQuiz
-      ? `اختبار عشوائي مخصص (${currentSubjectQuestions.length} سؤال)`
+      ? activeCustomQuizTitle
+        ? `${activeCustomQuizTitle} (${currentSubjectQuestions.length} سؤال)`
+        : `اختبار عشوائي مخصص (${currentSubjectQuestions.length} سؤال)`
       : chapterObj?.name || 'أسئلة المقرر';
     const completionPct =
       activeChapterStats.totalQuestions > 0
@@ -1207,13 +1316,17 @@ export const AutomationBankView: React.FC = () => {
             type="button"
             onClick={() => {
               setSelectedChapterId(null);
+              if (activeCustomQuizTitle) {
+                setActiveCustomQuizTitle(null);
+                setActiveChapterCategoryTab('my_quizzes');
+              }
               setChapterTempChoices({});
               setIsFilterPopoverOpen(false);
             }}
             className="px-2.5 py-1.5 rounded-xl bg-[#131D2E] text-slate-300 hover:text-white flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer shrink-0 border border-slate-800"
           >
             <ChevronRight className="w-4 h-4" />
-            <span>العودة للمقرر</span>
+            <span>{activeCustomQuizTitle ? 'العودة لاختباراتي' : 'العودة للمقرر'}</span>
           </button>
 
           <div className="text-right flex-1 min-w-0 px-1">
@@ -1353,8 +1466,35 @@ export const AutomationBankView: React.FC = () => {
               <ChevronDown className="w-3 h-3" />
             </button>
 
-            {/* Theme (Dark/Light), Eye Protection & Font Scale Controls */}
+            {/* Theme (Dark/Light), Vibrant Color Swatches, Eye Protection & Font Scale Controls */}
             <div className="flex items-center gap-1 flex-wrap">
+              <div
+                className="flex items-center gap-1 px-1.5 py-1 rounded-xl bg-slate-800/80 border border-slate-700"
+                title="تغيير لون التطبيق الحيوي"
+              >
+                <Palette className="w-3.5 h-3.5 text-emerald-400" />
+                {(
+                  [
+                    { id: 'emerald', bg: 'bg-emerald-500', label: 'أخضر زمردي' },
+                    { id: 'sky', bg: 'bg-sky-500', label: 'أزرق سماوي' },
+                    { id: 'orange', bg: 'bg-orange-500', label: 'برتقالي حيوي' },
+                    { id: 'purple', bg: 'bg-purple-500', label: 'بنفسجي' },
+                    { id: 'rose', bg: 'bg-rose-500', label: 'وردي مرجاني' },
+                  ] as const
+                ).map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setColorTheme(t.id)}
+                    title={t.label}
+                    aria-label={t.label}
+                    className={`w-3.5 h-3.5 rounded-full ${t.bg} transition-transform cursor-pointer ${
+                      colorTheme === t.id ? 'scale-125 ring-2 ring-white' : 'opacity-70 hover:opacity-100'
+                    }`}
+                  />
+                ))}
+              </div>
+
               <button
                 type="button"
                 onClick={toggleDarkMode}
@@ -1467,7 +1607,7 @@ export const AutomationBankView: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="space-y-5">
+          <div className={density.questionStreamGap}>
             {filteredChapterQuestions.map((q) => {
               const originalIndex = currentSubjectQuestions.findIndex(item => item.id === q.id);
               const solvedState = solvedQuestions[q.id];
@@ -1482,7 +1622,7 @@ export const AutomationBankView: React.FC = () => {
                   ref={(el) => {
                     questionCardRefs.current[q.id] = el;
                   }}
-                  className={`${cardSurfaceClass} rounded-3xl p-4 sm:p-6 border space-y-3.5 shadow-xl transition-all duration-300 ${
+                  className={`${cardSurfaceClass} ${density.cardRadius} ${density.questionCardPadding} border shadow-xl transition-all duration-300 ${
                     highlightedQuestionId === q.id
                       ? 'ring-2 ring-emerald-500 shadow-emerald-500/20'
                       : ''
@@ -2214,41 +2354,81 @@ export const AutomationBankView: React.FC = () => {
             </div>
           </div>
 
-          {isAdmin && (
-            <div className="flex items-center justify-end gap-1.5 flex-wrap pt-0.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setBulkImportSubjectId(activeSubject.id);
-                  setBulkImportChapterId(activeSubject.chapters?.[0]?.id || null);
-                  setIsBulkImportModalOpen(true);
-                }}
-                className="px-2.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
-                title="استيراد دفعي ذكي بالرموز (/q)"
-              >
-                <FileCode2 className="w-3.5 h-3.5" />
-                <span>استيراد دفعي (/q)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setModalTargetSubjectId(activeSubject.id);
-                  setQuestionToEdit(null);
-                  setIsQuestionModalOpen(true);
-                }}
-                className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>سؤال جديد</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsAddingChapter(true)}
-                className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>إضافة قسم</span>
-              </button>
+          {/* Per-Subject Offline Automation Download Row + Admin Actions */}
+          <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
+            {(() => {
+              const isSubjectSavedOffline =
+                Boolean(offlineAutoStatus.allPack) ||
+                Boolean(offlineAutoStatus.bySubjectId?.[activeSubject.id]);
+              return (
+                <button
+                  type="button"
+                  onClick={() => handleDownloadAutomationOffline('subject', activeSubject.id)}
+                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    isSubjectSavedOffline
+                      ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-300'
+                      : 'bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300'
+                  }`}
+                  title="تنزيل وحفظ جميع أقسام وأسئلة هذه المادة للعمل بدون إنترنت"
+                >
+                  {isSubjectSavedOffline ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>أتمتة المادة محفوظة أوفلاين ✓</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-3.5 h-3.5 text-sky-400" />
+                      <span>تنزيل أتمتة المادة أوفلاين ({subjectQuestionsAll.length} سؤال)</span>
+                    </>
+                  )}
+                </button>
+              );
+            })()}
+
+            {isAdmin && (
+              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkImportSubjectId(activeSubject.id);
+                    setBulkImportChapterId(activeSubject.chapters?.[0]?.id || null);
+                    setIsBulkImportModalOpen(true);
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                  title="استيراد دفعي ذكي بالرموز (/q)"
+                >
+                  <FileCode2 className="w-3.5 h-3.5" />
+                  <span>استيراد دفعي (/q)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalTargetSubjectId(activeSubject.id);
+                    setQuestionToEdit(null);
+                    setIsQuestionModalOpen(true);
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>سؤال جديد</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingChapter(true)}
+                  className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>إضافة قسم</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {offlineAutoNotice && (
+            <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-end gap-2">
+              <span>{offlineAutoNotice}</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             </div>
           )}
         </div>
@@ -2326,85 +2506,74 @@ export const AutomationBankView: React.FC = () => {
 
         {subjectSubTab === 'chapters' ? (
           <div className="space-y-4">
-            {/* Feature 1: Continue Last Visited Chapter Banner + Custom Multi-Chapter Quiz Button */}
-            <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
-              {lastVisitedChapter && lastVisitedStats && (
-                <div
-                  onClick={() => handleOpenChapter(lastVisitedChapter)}
-                  className="flex-1 p-3 rounded-2xl bg-[#131D2E] border border-emerald-500/40 hover:border-emerald-500 flex items-center justify-between gap-2.5 cursor-pointer transition-all shadow-xs"
-                >
-                  <div className="flex items-center gap-2 shrink-0">
-                    <StatCircleButton
-                      size="sm"
-                      stats={lastVisitedStats}
-                      title={`إحصائيات ${lastVisitedChapter.name}`}
-                      onClick={() =>
-                        setStatsModalConfig({
-                          isOpen: true,
-                          title: lastVisitedChapter.name,
-                          subtitle: activeSubject.name,
-                          stats: lastVisitedStats,
-                          questionIds: questions
-                            .filter(
-                              q =>
-                                q.subjectId === activeSubject.id &&
-                                (q.chapterId === lastVisitedChapter.id || q.chapterName === lastVisitedChapter.name)
-                            )
-                            .map(q => q.id),
-                          onStartSolving: () => handleOpenChapter(lastVisitedChapter),
-                        })
-                      }
-                    />
-                    <span className="px-2.5 py-1.5 rounded-xl bg-emerald-600 text-white text-[11px] font-bold flex items-center gap-1 whitespace-nowrap">
-                      <span>متابعة فورية</span>
-                      <ChevronLeft className="w-3.5 h-3.5" />
-                    </span>
-                  </div>
-
-                  <div className="text-right flex-1 min-w-0">
-                    <span className="text-[10px] font-bold text-emerald-400 block">
-                      آخر قسم كنت تدرسه:
-                    </span>
-                    <span className="font-bold text-xs sm:text-sm text-white truncate block">
-                      {lastVisitedChapter.name}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Feature 2: Custom Multi-Chapter Random Quiz Trigger */}
-              <button
-                type="button"
-                onClick={() => {
-                  setCustomQuizSelectedChapterIds(chaptersList.map(c => c.id));
-                  setIsCustomQuizModalOpen(true);
-                }}
-                className="p-3 rounded-2xl bg-[#131D2E] hover:bg-[#182438] border border-sky-500/40 hover:border-sky-500 flex items-center justify-between sm:justify-center gap-2.5 cursor-pointer transition-all shrink-0"
+            {/* Feature 1: Continue Last Visited Chapter Banner (if exists) */}
+            {lastVisitedChapter && lastVisitedStats && (
+              <div
+                onClick={() => handleOpenChapter(lastVisitedChapter)}
+                className="p-3 rounded-2xl bg-[#131D2E] border border-emerald-500/40 hover:border-emerald-500 flex items-center justify-between gap-2.5 cursor-pointer transition-all shadow-xs"
               >
-                <div className="w-8 h-8 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
-                  <Shuffle className="w-4 h-4" />
+                <div className="flex items-center gap-2 shrink-0">
+                  <StatCircleButton
+                    size="sm"
+                    stats={lastVisitedStats}
+                    title={`إحصائيات ${lastVisitedChapter.name}`}
+                    onClick={() =>
+                      setStatsModalConfig({
+                        isOpen: true,
+                        title: lastVisitedChapter.name,
+                        subtitle: activeSubject.name,
+                        stats: lastVisitedStats,
+                        questionIds: questions
+                          .filter(
+                            q =>
+                              q.subjectId === activeSubject.id &&
+                              (q.chapterId === lastVisitedChapter.id || q.chapterName === lastVisitedChapter.name)
+                          )
+                          .map(q => q.id),
+                        onStartSolving: () => handleOpenChapter(lastVisitedChapter),
+                      })
+                    }
+                  />
+                  <span className="px-2.5 py-1.5 rounded-xl bg-emerald-600 text-white text-[11px] font-bold flex items-center gap-1 whitespace-nowrap">
+                    <span>متابعة فورية</span>
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </span>
                 </div>
-                <div className="text-right">
-                  <span className="text-xs font-black text-white block">اختبار عشوائي مخصص</span>
-                  <span className="text-[10px] text-slate-400 block">دمج عدة أقسام باختبار واحد</span>
-                </div>
-              </button>
-            </div>
 
-            {/* Feature 3: Top Category Tabs (3 تبويبات: الأقسام | المحاضرات | شامل وجزئي) */}
-            <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#131D2E] rounded-2xl border border-slate-800 text-[11px] sm:text-xs font-bold tabular-nums">
+                <div className="text-right flex-1 min-w-0">
+                  <span className="text-[10px] font-bold text-emerald-400 block">
+                    آخر قسم كنت تدرسه:
+                  </span>
+                  <span className="font-bold text-xs sm:text-sm text-white truncate block">
+                    {lastVisitedChapter.name}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Feature 2: Top Category Tabs inside Subject (4 تبويبات: الأقسام | المحاضرات | شامل وجزئي | اختباراتي) */}
+            <div className="grid grid-cols-4 gap-1 sm:gap-1.5 p-1 bg-[#131D2E] rounded-2xl border border-slate-800 text-[10px] sm:text-xs font-bold tabular-nums">
               {[
                 { id: 'section' as const, label: 'الأقسام', count: sectionChapters.length },
                 { id: 'lecture' as const, label: 'المحاضرات', count: lectureChapters.length },
                 { id: 'comprehensive_partial' as const, label: 'شامل وجزئي', count: compChapters.length },
+                {
+                  id: 'my_quizzes' as const,
+                  label: 'اختباراتي',
+                  count: studentCustomQuizzes.filter(q => q.subjectIds.includes(activeSubject.id)).length,
+                },
               ].map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveChapterCategoryTab(tab.id)}
-                  className={`py-2 px-1.5 rounded-xl text-center transition-all cursor-pointer whitespace-nowrap ${
+                  className={`py-2 px-1 rounded-xl text-center transition-all cursor-pointer truncate ${
                     activeChapterCategoryTab === tab.id
-                      ? 'bg-emerald-600 text-white shadow-xs'
+                      ? tab.id === 'my_quizzes'
+                        ? 'bg-teal-600 text-white shadow-xs'
+                        : 'bg-emerald-600 text-white shadow-xs'
+                      : tab.id === 'my_quizzes'
+                      ? 'text-emerald-300 hover:text-white'
                       : 'text-slate-400 hover:text-white'
                   }`}
                 >
@@ -2413,75 +2582,97 @@ export const AutomationBankView: React.FC = () => {
               ))}
             </div>
 
-            {/* Feature 4: Search & Completion Status Filter Bar */}
-            <div className="bg-[#131D2E] border border-slate-800 rounded-2xl p-2.5 space-y-2">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="text"
-                  value={chapterListSearch}
-                  onChange={(e) => setChapterListSearch(e.target.value)}
-                  placeholder="ابحث عن اسم القسم أو المحاضرة..."
-                  className="w-full pr-8 pl-8 py-1.5 bg-slate-900/80 border border-slate-700/80 focus:border-emerald-500 rounded-xl text-xs text-white placeholder:text-slate-400 focus:outline-hidden text-right"
-                />
-                {chapterListSearch && (
-                  <button
-                    type="button"
-                    onClick={() => setChapterListSearch('')}
-                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between gap-1.5 flex-wrap text-[11px] font-bold">
-                <span className="text-slate-400">الفلترة حسب الإنجاز:</span>
-                <div className="flex items-center gap-1 flex-wrap">
-                  {[
-                    { id: 'all' as const, label: 'الكل' },
-                    { id: 'in_progress' as const, label: 'قيد الدراسة' },
-                    { id: 'completed' as const, label: 'مكتمل' },
-                    { id: 'not_started' as const, label: 'لم يبدأ' },
-                  ].map((stTab) => (
-                    <button
-                      key={stTab.id}
-                      type="button"
-                      onClick={() => setChapterStatusFilter(stTab.id)}
-                      className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
-                        chapterStatusFilter === stTab.id
-                          ? 'bg-sky-600 text-white'
-                          : 'bg-slate-800/80 text-slate-300 hover:text-white'
-                      }`}
-                    >
-                      {stTab.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Clean Organized Chapters List (All stats confined to StatCircleButton) */}
-            {displayedChapters.length === 0 ? (
-              <div className="text-center py-10 bg-[#131D2E] rounded-2xl border border-dashed border-slate-800 p-6 space-y-2">
-                <Layers className="w-8 h-8 text-slate-500 mx-auto" />
-                <p className="text-xs font-bold text-white">لا توجد أقسام مطابقة للبحث أو التصنيف المحدد</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveChapterCategoryTab('section');
-                    setChapterListSearch('');
-                    setChapterStatusFilter('all');
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold cursor-pointer"
-                >
-                  إظهار الأقسام الأساس
-                </button>
-              </div>
+            {activeChapterCategoryTab === 'my_quizzes' ? (
+              /* Subject-Scoped Custom Random Quizzes ('اختباراتي' for this subject) */
+              <MyQuizzesPanel
+                subject={activeSubject}
+                onLaunchQuiz={(quiz, resolvedQs) => {
+                  setCustomQuizQuestionIds(resolvedQs.map(q => q.id));
+                  setActiveCustomQuizTitle(quiz.title);
+                  setSelectedChapterId('__custom_quiz__');
+                  setChapterStreamFilter('all');
+                  setChapterSearchQuery('');
+                  setIsFilterPopoverOpen(false);
+                  setChapterTempChoices({});
+                  setStudySeconds(0);
+                  setIsTimerRunning(true);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onConfirmAction={openConfirmDialog}
+              />
             ) : (
-              <div className="space-y-2.5">
-                {displayedChapters.map((ch, idx) => renderChapterRow(ch, idx))}
-              </div>
+              <>
+                {/* Feature 3: Search & Completion Status Filter Bar */}
+                <div className="bg-[#131D2E] border border-slate-800 rounded-2xl p-2.5 space-y-2">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={chapterListSearch}
+                      onChange={(e) => setChapterListSearch(e.target.value)}
+                      placeholder="ابحث عن اسم القسم أو المحاضرة..."
+                      className="w-full pr-8 pl-8 py-1.5 bg-slate-900/80 border border-slate-700/80 focus:border-emerald-500 rounded-xl text-xs text-white placeholder:text-slate-400 focus:outline-hidden text-right"
+                    />
+                    {chapterListSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setChapterListSearch('')}
+                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between gap-1.5 flex-wrap text-[11px] font-bold">
+                    <span className="text-slate-400">الفلترة حسب الإنجاز:</span>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {[
+                        { id: 'all' as const, label: 'الكل' },
+                        { id: 'in_progress' as const, label: 'قيد الدراسة' },
+                        { id: 'completed' as const, label: 'مكتمل' },
+                        { id: 'not_started' as const, label: 'لم يبدأ' },
+                      ].map((stTab) => (
+                        <button
+                          key={stTab.id}
+                          type="button"
+                          onClick={() => setChapterStatusFilter(stTab.id)}
+                          className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
+                            chapterStatusFilter === stTab.id
+                              ? 'bg-sky-600 text-white'
+                              : 'bg-slate-800/80 text-slate-300 hover:text-white'
+                          }`}
+                        >
+                          {stTab.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Clean Organized Chapters List (All stats confined to StatCircleButton) */}
+                {displayedChapters.length === 0 ? (
+                  <div className="text-center py-10 bg-[#131D2E] rounded-2xl border border-dashed border-slate-800 p-6 space-y-2">
+                    <Layers className="w-8 h-8 text-slate-500 mx-auto" />
+                    <p className="text-xs font-bold text-white">لا توجد أقسام مطابقة للبحث أو التصنيف المحدد</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveChapterCategoryTab('section');
+                        setChapterListSearch('');
+                        setChapterStatusFilter('all');
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold cursor-pointer"
+                    >
+                      إظهار الأقسام الأساس
+                    </button>
+                  </div>
+                ) : (
+                  <div className={density.chaptersGrid}>
+                    {displayedChapters.map((ch, idx) => renderChapterRow(ch, idx))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         ) : (
@@ -2930,53 +3121,100 @@ export const AutomationBankView: React.FC = () => {
   // ==========================================
   return (
     <div className="w-full max-w-md mx-auto sm:max-w-2xl lg:max-w-3xl px-3.5 py-3.5 space-y-4 overflow-x-hidden">
-      {/* Top Header */}
-      <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-        <button
-          type="button"
-          onClick={() => {
-            commitExitFromMistakesOrSaved();
-            setActiveSection('home');
-          }}
-          className="p-1.5 rounded-xl text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
-          title="العودة للرئيسية"
-          aria-label="العودة للرئيسية"
-        >
-          <ChevronRight className="w-6 h-6" />
-        </button>
+      {/* Top Header (Click MedFur in top header to return Home) */}
+      <div className="space-y-2 pb-2 border-b border-slate-800">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h1 className="text-base sm:text-xl font-black text-emerald-400 text-right">
+            بنك الأتمتة الأكاديمي
+          </h1>
 
-        <h1 className="text-lg sm:text-xl font-black text-emerald-400 text-center">
-          بنك الأتمتة الأكاديمي
-        </h1>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Global Download All Automation Offline Button */}
+            <button
+              type="button"
+              onClick={() => handleDownloadAutomationOffline('all')}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                offlineAutoStatus.allPack
+                  ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-300'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm'
+              }`}
+              title="تنزيل وحفظ جميع أسئلة ومواد بنك الأتمتة للعمل بدون إنترنت"
+            >
+              {offlineAutoStatus.allPack ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>كل الأتمتة محفوظة أوفلاين ({offlineAutoStatus.allPack.questionsCount})</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>تنزيل كل الأتمتة أوفلاين</span>
+                </>
+              )}
+            </button>
 
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={toggleDarkMode}
-            className="p-2 rounded-xl border bg-[#131D2E] border-slate-800 text-slate-300 hover:text-white cursor-pointer transition-colors"
-            title={darkMode ? 'التبديل إلى الوضع النهاري' : 'التبديل إلى الوضع الليلي'}
-            aria-label="تبديل الوضع الليلي والنهاري"
-          >
-            {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-sky-600" />}
-          </button>
+            <div
+              className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-[#131D2E] border border-slate-800"
+              title="تغيير لون التطبيق الحيوي"
+            >
+              <Palette className="w-3.5 h-3.5 text-emerald-400" />
+              {(
+                [
+                  { id: 'emerald', bg: 'bg-emerald-500', label: 'أخضر زمردي' },
+                  { id: 'sky', bg: 'bg-sky-500', label: 'أزرق سماوي' },
+                  { id: 'orange', bg: 'bg-orange-500', label: 'برتقالي حيوي' },
+                  { id: 'purple', bg: 'bg-purple-500', label: 'بنفسجي' },
+                  { id: 'rose', bg: 'bg-rose-500', label: 'وردي مرجاني' },
+                ] as const
+              ).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setColorTheme(t.id)}
+                  title={t.label}
+                  aria-label={t.label}
+                  className={`w-3.5 h-3.5 rounded-full ${t.bg} transition-transform cursor-pointer ${
+                    colorTheme === t.id ? 'scale-125 ring-2 ring-white' : 'opacity-70 hover:opacity-100'
+                  }`}
+                />
+              ))}
+            </div>
 
-          <button
-            type="button"
-            onClick={toggleEyeComfortMode}
-            className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors ${
-              eyeComfortMode
-                ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
-                : 'bg-[#131D2E] border-slate-800 text-slate-400 hover:text-white'
-            }`}
-            title="وضع القراءة المريح للعين"
-            aria-label="وضع القراءة المريح للعين"
-          >
-            <Eye className="w-4 h-4" />
-          </button>
+            <button
+              type="button"
+              onClick={toggleDarkMode}
+              className="p-2 rounded-xl border bg-[#131D2E] border-slate-800 text-slate-300 hover:text-white cursor-pointer transition-colors"
+              title={darkMode ? 'التبديل إلى الوضع النهاري' : 'التبديل إلى الوضع الليلي'}
+              aria-label="تبديل الوضع الليلي والنهاري"
+            >
+              {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-sky-600" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleEyeComfortMode}
+              className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors ${
+                eyeComfortMode
+                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
+                  : 'bg-[#131D2E] border-slate-800 text-slate-400 hover:text-white'
+              }`}
+              title="وضع القراءة المريح للعين"
+              aria-label="وضع القراءة المريح للعين"
+            >
+              <Eye className="w-4 h-4" />
+            </button>
+          </div>
         </div>
+
+        {offlineAutoNotice && (
+          <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-end gap-2">
+            <span>{offlineAutoNotice}</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          </div>
+        )}
       </div>
 
-      {/* Main View Tabs (5 Tabs including Supervisor Reports & Review Panel) */}
+      {/* Main View Tabs */}
       <div className={`grid ${isAdmin ? 'grid-cols-5' : 'grid-cols-4'} gap-1 sm:gap-1.5 p-1 bg-[#131D2E] rounded-2xl border border-slate-800 text-[10px] sm:text-xs font-bold min-w-0`}>
         <button
           type="button"
@@ -3148,8 +3386,8 @@ export const AutomationBankView: React.FC = () => {
             </div>
           )}
 
-          {/* Subjects Vertical List (All statistics confined strictly inside StatCircleButton) */}
-          <div className="space-y-3">
+          {/* Subjects List / Grid (Adapts to UI Density: 2 columns in compact mode) */}
+          <div className={density.subjectsGrid}>
             {currentSubjects.map((sub) => {
               const subQuestions = questions.filter(q => q.subjectId === sub.id);
               const subStats = computeQuestionStats(subQuestions, solvedQuestions);

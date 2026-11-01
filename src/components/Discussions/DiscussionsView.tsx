@@ -52,6 +52,7 @@ export const DiscussionsView: React.FC = () => {
   const { 
     user, 
     isAdmin, 
+    isGuest,
     channels, 
     activeChannelId, 
     setActiveChannelId, 
@@ -1229,8 +1230,21 @@ export const DiscussionsView: React.FC = () => {
           </div>
 
           {/* Chat Input Bar */}
-          <div className="p-3 bg-[#111A2E] border-t border-slate-800/80">
-            {isRecordingVoice ? (
+          <div className="p-2.5 sm:p-3 bg-[#111A2E] border-t border-slate-800/80">
+            {isGuest ? (
+              <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-slate-900/90 border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer shrink-0 transition-colors"
+                >
+                  تسجيل الدخول / تبديل الحساب
+                </button>
+                <p className="text-[11px] sm:text-xs font-bold text-slate-300 text-right">
+                  أنت تتصفح في وضع الضيف — سجل الدخول كطالب أو مشرف للمشاركة ورفع الملفات والصور
+                </p>
+              </div>
+            ) : isRecordingVoice ? (
               <div className="flex items-center justify-between gap-3 p-2 bg-rose-950/40 border border-rose-800/80 rounded-2xl">
                 <button
                   type="button"

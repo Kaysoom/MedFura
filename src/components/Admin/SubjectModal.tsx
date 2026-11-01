@@ -54,7 +54,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({ isOpen, onClose, sub
   const previewSubject = {
     name: name || 'مادة طبية',
     department,
-    icon: selectedIcon === 'auto' ? undefined : selectedIcon,
+    icon: selectedIcon === 'auto' ? '' : selectedIcon,
     color: subjectToEdit?.color,
   };
   const resolvedPreview = resolveSubjectMedicalIcon(previewSubject);

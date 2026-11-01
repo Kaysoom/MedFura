@@ -1,5 +1,6 @@
 export type AcademicYearId = 'year-prep' | 'year-2' | 'year-3' | 'year-4' | 'year-5' | 'year-6';
 export type SemesterType = 'first' | 'second';
+export type AccountType = 'admin' | 'student' | 'guest';
 
 export interface UserProfile {
   uid: string;
@@ -11,7 +12,9 @@ export interface UserProfile {
   yearBadge?: '2' | '3' | '0'; // 2 لسنة ثانية، 3 لسنة ثالثة، 0 للآخرين
   academicYear: string;
   batch?: string; // e.g. "دفعة 30"
-  role: 'student' | 'admin';
+  role: 'student' | 'admin' | 'guest';
+  accountType?: AccountType;
+  canToggleRole?: boolean;
   photoURL?: string;
   blockedUsers?: string[]; // قائمة الأرقام الامتحانية أو المعرفات المحظورة
   createdAt?: string;
@@ -152,6 +155,8 @@ export interface QuestionCommentItem {
   authorBatch?: string;
   content: string;
   createdAt: string;
+  updatedAt?: string;
+  isEdited?: boolean;
   likesCount: number;
   likedBy: string[];
 }
@@ -189,7 +194,16 @@ export interface LibraryFolderItem {
   type: 'folder';
   yearId?: AcademicYearId;
   semester?: SemesterType;
+  semesterBadge?: '1' | '2';
+  isSubject?: boolean;
   subjectId?: string;
+  icon?: string;
+  department?: string;
+  coverColor?: string;
+  coverImage?: string;
+  coverLabel?: string;
+  orderIndex?: number;
+  isPinned?: boolean;
 }
 
 export interface LibraryFileItem {
@@ -199,10 +213,15 @@ export interface LibraryFileItem {
   fileType: 'محاضرة' | 'تفريغ / نوطة' | 'سلايدات' | 'كتاب / مرجع' | 'دورة امتحانية' | 'أخرى';
   author: string;
   fileSize: string;
+  fileSizeBytes?: number;
+  format?: string;
+  mimeType?: string;
   downloadsCount: number;
   downloadUrl?: string;
   pages?: number;
   date?: string;
+  orderIndex?: number;
+  isPinned?: boolean;
 }
 
 export interface VideoFolderItem {
@@ -212,6 +231,8 @@ export interface VideoFolderItem {
   subjectId?: string;
   yearId?: AcademicYearId;
   semester?: SemesterType;
+  orderIndex?: number;
+  isPinned?: boolean;
 }
 
 export interface VideoItem {
@@ -223,6 +244,10 @@ export interface VideoItem {
   title: string;
   doctorName: string;
   duration: string;
+  durationSeconds?: number;
+  fileSize?: string;
+  fileSizeBytes?: number;
+  mimeType?: string;
   videoUrl: string;
   thumbnail?: string;
   academicYear: string;
@@ -233,6 +258,8 @@ export interface VideoItem {
   description?: string;
   requiresInternet?: boolean;
   downloadUrl?: string;
+  orderIndex?: number;
+  isPinned?: boolean;
 }
 
 export interface MarketplaceItem {
@@ -429,13 +456,72 @@ export interface DirectMessage {
 export type ActiveSection = 
   | 'home' 
   | 'automation' 
+  | 'my_quizzes'
   | 'library' 
   | 'marketplace' 
   | 'videos' 
   | 'grades' 
   | 'announcements'
   | 'discussions'
+  | 'settings'
   | 'guide'
   | 'about';
+
+export type UIDensityMode = 'balanced' | 'compact';
+
+export interface QuizBehaviorPreferences {
+  confirmMode: 'double' | 'single'; // نقرتان للتأكيد أو نقرة واحدة فورية
+  autoAdvanceOnCorrect: boolean; // الانتقال التلقائي للسؤال التالي عند الإجابة الصحيحة
+  autoExpandExplanation: boolean; // فتح التعليل الطبي تلقائياً بعد الحل
+  soundEffects: boolean; // مؤثرات صوتية تفاعلية عند الحل
+}
+
+export interface StudyBackupPayload {
+  version: number;
+  exportedAt: string;
+  accountType: AccountType;
+  solvedQuestions: Record<string, { chosenOption: number; isCorrect: boolean }>;
+  savedQuestionIds: string[];
+  wrongQuestionIds: string[];
+  questionNotes: Record<string, string>;
+  studentCustomQuizzes: StudentCustomQuiz[];
+}
+
+export type CustomQuizSourceFilter = 'all' | 'unsolved' | 'wrong' | 'saved';
+
+export interface StudentCustomQuiz {
+  id: string;
+  title: string;
+  description?: string;
+  yearId?: AcademicYearId;
+  semester?: SemesterType;
+  subjectIds: string[];
+  categories?: ChapterCategory[]; // أقسام | محاضرات | شامل وجزئي
+  chapterIds: string[]; // empty array = all chapters of selected categories/subject
+  questionLimit: number | 'all';
+  sourceFilter: CustomQuizSourceFilter;
+  shuffleQuestions: boolean;
+  timeLimitMinutes?: number; // 0 or undefined = untimed
+  questionIds: string[]; // snapshot or dynamically resolved question IDs
+  createdAt: string;
+  lastAttemptAt?: string;
+}
+
+export type ColorThemeId = 'emerald' | 'sky' | 'orange' | 'purple' | 'rose';
+
+export type DarkModeSchedule = 'manual' | 'system' | 'time';
+
+export interface AppNotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  category: 'library' | 'announcement';
+  targetSection: ActiveSection;
+  createdAt: string;
+  timestamp: number;
+  isRead?: boolean;
+}
+
+
 
 

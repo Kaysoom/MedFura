@@ -11,9 +11,21 @@
         "studentId": { "type": "string", "maxLength": 20 },
         "academicYear": { "type": "string", "maxLength": 50 },
         "role": { "type": "string", "enum": ["student", "admin"] },
+        "readNotificationIds": { "type": "array", "items": { "type": "string" } },
         "createdAt": { "type": "string" }
       },
       "required": ["uid", "email", "studentId", "academicYear", "role"]
+    },
+    "UserNotificationState": {
+      "title": "User Notification Read State",
+      "description": "Stores read notification IDs per user in Firebase",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "readNotificationIds": { "type": "array", "items": { "type": "string" } },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "readNotificationIds"]
     },
     "Subject": {
       "title": "Academic Subject",
@@ -128,6 +140,10 @@
     "/announcements/{announcementId}": {
       "schema": "Announcement",
       "description": "Student union announcements and notices"
+    },
+    "/user_notifications/{userId}": {
+      "schema": "UserNotificationState",
+      "description": "User read notification IDs persisted in Firestore"
     }
   }
 }

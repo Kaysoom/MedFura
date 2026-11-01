@@ -19,7 +19,9 @@ html:not(.dark):not(.eye-comfort) body {
 
 html:not(.dark):not(.eye-comfort) .bg-\[\#0B132B\]\/90,
 html:not(.dark):not(.eye-comfort) .bg-\[\#0E172A\],
+html:not(.dark):not(.eye-comfort) .bg-\[\#0F172A\],
 html:not(.dark):not(.eye-comfort) .bg-\[\#0E172A\]\/90,
+html:not(.dark):not(.eye-comfort) .bg-\[\#0E172A\]\/95,
 html:not(.dark):not(.eye-comfort) .bg-\[\#111A2E\],
 html:not(.dark):not(.eye-comfort) .bg-\[\#111A2E\]\/95,
 html:not(.dark):not(.eye-comfort) .bg-\[\#131D2E\],
@@ -40,7 +42,11 @@ html:not(.dark):not(.eye-comfort) .bg-\[\#182438\],
 html:not(.dark):not(.eye-comfort) .bg-\[\#152033\],
 html:not(.dark):not(.eye-comfort) .bg-\[\#152238\],
 html:not(.dark):not(.eye-comfort) .bg-slate-900,
+html:not(.dark):not(.eye-comfort) .bg-slate-900\/70,
 html:not(.dark):not(.eye-comfort) .bg-slate-900\/80,
+html:not(.dark):not(.eye-comfort) .bg-slate-900\/90,
+html:not(.dark):not(.eye-comfort) .bg-slate-900\/95,
+html:not(.dark):not(.eye-comfort) .bg-slate-950\/60,
 html:not(.dark):not(.eye-comfort) .bg-slate-800,
 html:not(.dark):not(.eye-comfort) .bg-slate-800\/60,
 html:not(.dark):not(.eye-comfort) .bg-slate-800\/70,
@@ -111,7 +117,8 @@ html:not(.dark):not(.eye-comfort) .bg-emerald-950\/75 {
 }
 
 html:not(.dark):not(.eye-comfort) .bg-emerald-950\/30,
-html:not(.dark):not(.eye-comfort) .bg-emerald-950\/40 {
+html:not(.dark):not(.eye-comfort) .bg-emerald-950\/40,
+html:not(.dark):not(.eye-comfort) .bg-emerald-950\/80 {
   background-color: #ecfdf5 !important;
   border-color: #6ee7b7 !important;
   color: #064e3b !important;
@@ -142,7 +149,7 @@ html:not(.dark):not(.eye-comfort) .bg-indigo-950\/30 {
   color: #1e1b4b !important;
 }
 
-/* Keep solid filled buttons white-text in Light Mode */
+/* Keep solid filled buttons & dark-surface-preserve media overlays white-text in Light Mode */
 html:not(.dark):not(.eye-comfort) .bg-emerald-600 .text-white,
 html:not(.dark):not(.eye-comfort) .bg-emerald-600.text-white,
 html:not(.dark):not(.eye-comfort) .bg-sky-600 .text-white,
@@ -151,12 +158,17 @@ html:not(.dark):not(.eye-comfort) .bg-indigo-600 .text-white,
 html:not(.dark):not(.eye-comfort) .bg-indigo-600.text-white,
 html:not(.dark):not(.eye-comfort) .bg-violet-600 .text-white,
 html:not(.dark):not(.eye-comfort) .bg-violet-600.text-white,
+html:not(.dark):not(.eye-comfort) .bg-purple-600 .text-white,
+html:not(.dark):not(.eye-comfort) .bg-purple-600.text-white,
 html:not(.dark):not(.eye-comfort) .bg-rose-600 .text-white,
 html:not(.dark):not(.eye-comfort) .bg-rose-600.text-white,
 html:not(.dark):not(.eye-comfort) .bg-amber-600 .text-white,
 html:not(.dark):not(.eye-comfort) .bg-amber-600.text-white,
 html:not(.dark):not(.eye-comfort) .bg-sky-500.text-white,
-html:not(.dark):not(.eye-comfort) .bg-indigo-500.text-white {
+html:not(.dark):not(.eye-comfort) .bg-indigo-500.text-white,
+html:not(.dark):not(.eye-comfort) .dark-surface-preserve,
+html:not(.dark):not(.eye-comfort) .dark-surface-preserve .text-white,
+html:not(.dark):not(.eye-comfort) .dark-surface-preserve .text-slate-200 {
   color: #ffffff !important;
 }
 
@@ -438,4 +450,182 @@ html:not(.dark).eye-comfort .subject-medical-badge {
   border-color: #cbb490 !important;
   filter: saturate(1.15) contrast(1.15);
 }
+
+/* =========================================================
+   5. VIBRANT COLOR THEME ENGINE (تعدد الألوان الحيوية للتطبيق)
+   Themes:
+   - emerald (الأخضر الزمردي الحيوي - الافتراضي)
+   - sky (الأزرق السماوي المشرق)
+   - orange (البرتقالي الحيوي الدافئ)
+   - purple (البنفسجي العصري)
+   - rose (الوردي المرجاني)
+   ========================================================= */
+:root,
+html[data-color-theme="emerald"] {
+  --medfur-accent: #10b981;
+  --medfur-accent-hover: #059669;
+  --medfur-accent-light: #34d399;
+  --medfur-accent-lighter: #6ee7b7;
+  --medfur-accent-dark: #047857;
+  --medfur-accent-soft: rgba(16, 185, 129, 0.16);
+  --medfur-accent-medium: rgba(16, 185, 129, 0.24);
+  --medfur-accent-border: rgba(16, 185, 129, 0.42);
+  --medfur-accent-glow: rgba(16, 185, 129, 0.28);
+  --medfur-grad-end: #38bdf8;
+}
+
+html[data-color-theme="sky"] {
+  --medfur-accent: #0ea5e9;
+  --medfur-accent-hover: #0284c7;
+  --medfur-accent-light: #38bdf8;
+  --medfur-accent-lighter: #7dd3fc;
+  --medfur-accent-dark: #0369a1;
+  --medfur-accent-soft: rgba(14, 165, 233, 0.16);
+  --medfur-accent-medium: rgba(14, 165, 233, 0.24);
+  --medfur-accent-border: rgba(14, 165, 233, 0.45);
+  --medfur-accent-glow: rgba(14, 165, 233, 0.3);
+  --medfur-grad-end: #6366f1;
+}
+
+html[data-color-theme="orange"] {
+  --medfur-accent: #f97316;
+  --medfur-accent-hover: #ea580c;
+  --medfur-accent-light: #fb923c;
+  --medfur-accent-lighter: #fdba74;
+  --medfur-accent-dark: #c2410c;
+  --medfur-accent-soft: rgba(249, 115, 22, 0.16);
+  --medfur-accent-medium: rgba(249, 115, 22, 0.24);
+  --medfur-accent-border: rgba(249, 115, 22, 0.45);
+  --medfur-accent-glow: rgba(249, 115, 22, 0.3);
+  --medfur-grad-end: #f59e0b;
+}
+
+html[data-color-theme="purple"] {
+  --medfur-accent: #8b5cf6;
+  --medfur-accent-hover: #7c3aed;
+  --medfur-accent-light: #a78bfa;
+  --medfur-accent-lighter: #c4b5fd;
+  --medfur-accent-dark: #6d28d9;
+  --medfur-accent-soft: rgba(139, 92, 246, 0.17);
+  --medfur-accent-medium: rgba(139, 92, 246, 0.25);
+  --medfur-accent-border: rgba(139, 92, 246, 0.45);
+  --medfur-accent-glow: rgba(139, 92, 246, 0.32);
+  --medfur-grad-end: #ec4899;
+}
+
+html[data-color-theme="rose"] {
+  --medfur-accent: #f43f5e;
+  --medfur-accent-hover: #e11d48;
+  --medfur-accent-light: #fb7185;
+  --medfur-accent-lighter: #fda4af;
+  --medfur-accent-dark: #be123c;
+  --medfur-accent-soft: rgba(244, 63, 94, 0.16);
+  --medfur-accent-medium: rgba(244, 63, 94, 0.24);
+  --medfur-accent-border: rgba(244, 63, 94, 0.45);
+  --medfur-accent-glow: rgba(244, 63, 94, 0.3);
+  --medfur-grad-end: #fb923c;
+}
+
+/* Dynamic Primary Accent Overrides when non-default theme is selected */
+html[data-color-theme]:not([data-color-theme="emerald"]) .bg-emerald-600,
+html[data-color-theme]:not([data-color-theme="emerald"]) .bg-emerald-500,
+html[data-color-theme]:not([data-color-theme="emerald"]) .bg-\[\#10B981\] {
+  background-color: var(--medfur-accent) !important;
+  box-shadow: 0 4px 14px -2px var(--medfur-accent-glow);
+}
+
+html[data-color-theme]:not([data-color-theme="emerald"]) .bg-emerald-600:hover,
+html[data-color-theme]:not([data-color-theme="emerald"]) .bg-emerald-500:hover,
+html[data-color-theme]:not([data-color-theme="emerald"]) .bg-\[\#10B981\]:hover,
+html[data-color-theme]:not([data-color-theme="emerald"]) .hover\:bg-emerald-700:hover,
+html[data-color-theme]:not([data-color-theme="emerald"]) .hover\:bg-emerald-600:hover {
+  background-color: var(--medfur-accent-hover) !important;
+}
+
+html[data-color-theme]:not([data-color-theme="emerald"]) .text-emerald-400,
+html[data-color-theme]:not([data-color-theme="emerald"]) .dark\:text-emerald-400,
+html[data-color-theme]:not([data-color-theme="emerald"]) .hover\:text-emerald-400:hover {
+  color: var(--medfur-accent-light) !important;
+}
+
+html[data-color-theme]:not([data-color-theme="emerald"]) .text-emerald-300,
+html[data-color-theme]:not([data-color-theme="emerald"]) .dark\:text-emerald-300 {
+  color: var(--medfur-accent-lighter) !important;
+}
+
+html[data-color-theme]:not([data-color-theme="emerald"]) .text-emerald-500,
+html[data-color-theme]:not([data-color-theme="emerald"]) .text-emerald-600 {
+  color: var(--medfur-accent) !important;
+}
+
+html[data-color-theme]:not([data-color-theme="emerald"]) .bg-emerald-500\/10,
+html[data-color-theme]:not([data-color-theme="emerald"]) .bg-emerald-500\/15,
+html[data-color-theme]:not([data-color-theme="emerald"]) .bg-emerald-600\/15 {
+  background-color: var(--medfur-accent-soft) !important;
+}
+
+html[data-color-theme]:not([data-color-theme="emerald"]) .bg-emerald-500\/20,
+html[data-color-theme]:not([data-color-theme="emerald"]) .bg-emerald-500\/25,
+html[data-color-theme]:not([data-color-theme="emerald"]) .bg-emerald-600\/20,
+html[data-color-theme]:not([data-color-theme="emerald"]) .bg-emerald-600\/25,
+html[data-color-theme]:not([data-color-theme="emerald"]) .hover\:bg-emerald-500\/25:hover,
+html[data-color-theme]:not([data-color-theme="emerald"]) .hover\:bg-emerald-600\/30:hover {
+  background-color: var(--medfur-accent-medium) !important;
+}
+
+html[data-color-theme]:not([data-color-theme="emerald"]) .border-emerald-500,
+html[data-color-theme]:not([data-color-theme="emerald"]) .border-emerald-500\/30,
+html[data-color-theme]:not([data-color-theme="emerald"]) .border-emerald-500\/40,
+html[data-color-theme]:not([data-color-theme="emerald"]) .border-emerald-500\/50,
+html[data-color-theme]:not([data-color-theme="emerald"]) .border-emerald-400\/40,
+html[data-color-theme]:not([data-color-theme="emerald"]) .focus\:border-emerald-500:focus {
+  border-color: var(--medfur-accent-border) !important;
+}
+
+/* Brand Gradient Text & Vibrant Hero Highlights */
+.medfur-brand-gradient {
+  background-image: linear-gradient(135deg, var(--medfur-accent-light) 0%, var(--medfur-grad-end) 100%) !important;
+}
+
+.medfur-vibrant-btn {
+  background-image: linear-gradient(135deg, var(--medfur-accent) 0%, var(--medfur-accent-hover) 100%);
+  box-shadow: 0 4px 15px -3px var(--medfur-accent-glow);
+}
+
+/* =========================================================
+   6. COMPACT / DENSE UI MODE (الوضع المدمج والمكثف)
+   Tightens margins, paddings, and vertical spacing across views
+   to display maximum information per viewport.
+   ========================================================= */
+html[data-density="compact"] main > div {
+  padding-top: 0.65rem !important;
+  padding-bottom: 0.65rem !important;
+}
+
+html[data-density="compact"] .space-y-5 > :not([hidden]) ~ :not([hidden]),
+html[data-density="compact"] .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.65rem !important;
+}
+
+html[data-density="compact"] .space-y-3\.5 > :not([hidden]) ~ :not([hidden]),
+html[data-density="compact"] .space-y-3 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.5rem !important;
+}
+
+html[data-density="compact"] .p-5,
+html[data-density="compact"] .sm\:p-6 {
+  padding: 0.85rem !important;
+}
+
+html[data-density="compact"] .p-4,
+html[data-density="compact"] .p-3\.5 {
+  padding: 0.65rem !important;
+}
+
+html[data-density="compact"] .rounded-3xl {
+  border-radius: 1rem !important;
+}
+
+
+
 

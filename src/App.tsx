@@ -10,8 +10,15 @@ import { VideosView } from './components/Videos/VideosView';
 import { GradesView } from './components/Grades/GradesView';
 import { AnnouncementsView } from './components/Announcements/AnnouncementsView';
 import { DiscussionsView } from './components/Discussions/DiscussionsView';
+import { SettingsView } from './components/Settings/SettingsView';
 import { DirectChatWidget } from './components/Chat/DirectChatWidget';
 import { PWAInstallPrompt } from './components/Common/PWAInstallPrompt';
+import { DownloadManager } from './components/Common/DownloadManager';
+import {
+  InAppMediaViewerModal,
+  InAppViewerItem,
+} from './components/Common/InAppMediaViewerModal';
+import { Bell, FolderArchive, Building, X } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const {
@@ -22,12 +29,52 @@ const AppContent: React.FC = () => {
     selectedChapterId,
     setSelectedChapterId,
     darkMode,
+    setDarkMode,
+    darkModeSchedule,
     eyeComfortMode,
+    activeToastNotification,
+    dismissToastNotification,
+    markNotificationAsRead,
   } = useApp();
 
   const [showExitToast, setShowExitToast] = useState(false);
+  const [globalViewerItem, setGlobalViewerItem] =
+    useState<InAppViewerItem | null>(null);
   const lastBackPressTimeRef = useRef<number>(0);
   const isHandlingPopStateRef = useRef<boolean>(false);
+
+  // Automatic Dark Mode Detection based on System Preferences or Device Time
+  useEffect(() => {
+    if (darkModeSchedule === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const applySystemPreference = (matches: boolean) => {
+        setDarkMode(matches);
+        localStorage.setItem('uniportal_theme', matches ? 'dark' : 'light');
+      };
+
+      applySystemPreference(mediaQuery.matches);
+
+      const handleSystemChange = (event: MediaQueryListEvent) => {
+        applySystemPreference(event.matches);
+      };
+
+      mediaQuery.addEventListener('change', handleSystemChange);
+      return () => mediaQuery.removeEventListener('change', handleSystemChange);
+    }
+
+    if (darkModeSchedule === 'time') {
+      const checkDeviceTime = () => {
+        const currentHour = new Date().getHours();
+        const isNightHours = currentHour >= 18 || currentHour < 6;
+        setDarkMode(isNightHours);
+        localStorage.setItem('uniportal_theme', isNightHours ? 'dark' : 'light');
+      };
+
+      checkDeviceTime();
+      const intervalId = setInterval(checkDeviceTime, 60 * 1000);
+      return () => clearInterval(intervalId);
+    }
+  }, [darkModeSchedule, setDarkMode]);
 
   // Keep refs of current navigation state for the popstate listener
   const navStateRef = useRef({
@@ -137,8 +184,61 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      {/* Top Header with 3 Horizontal Lines Drawer Menu & Persona Switcher */}
+      {/* Top Header with Global Search, Vibrant Theme Picker, Notifications & Drawer Menu */}
       <Header />
+
+      {/* Live Local Notification Toast Banner when a new Library file or Announcement is added */}
+      {activeToastNotification && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="fixed top-16 left-1/2 -translate-x-1/2 z-50 w-[92vw] max-w-md bg-[#0E172A]/95 backdrop-blur-md border border-emerald-500/50 rounded-2xl p-3.5 text-white shadow-2xl flex items-start justify-between gap-3 animate-in fade-in slide-in-from-top-3 duration-200"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              markNotificationAsRead(activeToastNotification.id);
+              setActiveSection(activeToastNotification.targetSection);
+              setSelectedSubjectId(null);
+              setSelectedChapterId(null);
+              dismissToastNotification();
+            }}
+            className="flex items-start gap-3 text-right flex-1 min-w-0 cursor-pointer"
+          >
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
+              {activeToastNotification.category === 'library' ? (
+                <FolderArchive className="w-4 h-4" />
+              ) : activeToastNotification.category === 'announcement' ? (
+                <Building className="w-4 h-4" />
+              ) : (
+                <Bell className="w-4 h-4" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                <p className="font-black text-xs text-emerald-400 truncate">
+                  {activeToastNotification.title}
+                </p>
+              </div>
+              <p className="text-xs text-slate-200 line-clamp-2 mt-0.5">
+                {activeToastNotification.message}
+              </p>
+              <span className="inline-block text-[10px] text-slate-400 mt-1 font-bold">
+                اضغط للانتقال وتحديد التنبيه كمقروء
+              </span>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={dismissToastNotification}
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+            aria-label="إغلاق التنبيه"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Main View Area */}
       <main className={`flex-1 w-full max-w-full min-w-0 flex flex-col ${activeSection === 'discussions' ? 'h-[calc(100dvh-50px)] overflow-hidden' : 'pb-16'}`}>
@@ -149,6 +249,7 @@ const AppContent: React.FC = () => {
         {activeSection === 'discussions' && <DiscussionsView />}
         {activeSection === 'videos' && <VideosView />}
         {activeSection === 'grades' && <GradesView />}
+        {activeSection === 'settings' && <SettingsView />}
         {(activeSection === 'announcements' || activeSection === 'about') && <AnnouncementsView />}
       </main>
 
@@ -167,6 +268,31 @@ const AppContent: React.FC = () => {
         </div>
       )}
 
+      {/* Global Floating DownloadManager & Viewer for Cached Media */}
+      <DownloadManager
+        variant="floating"
+        onOpenMediaItem={(rec) =>
+          setGlobalViewerItem({
+            id: rec.id,
+            type:
+              rec.itemType ||
+              (rec.mimeType?.startsWith('video/') ? 'video' : 'file'),
+            title: rec.title || rec.fileName.replace(/\.[^/.]+$/, ''),
+            subtitle: rec.subtitle,
+            authorOrDoctor: rec.authorOrDoctor,
+            pages: rec.pages,
+            duration: rec.duration,
+            format: rec.format,
+            mimeType: rec.mimeType,
+          })
+        }
+      />
+
+      <InAppMediaViewerModal
+        item={globalViewerItem}
+        onClose={() => setGlobalViewerItem(null)}
+      />
+
       {/* Direct Peer-to-Peer Chat Widget */}
       <DirectChatWidget />
 
@@ -183,3 +309,4 @@ export default function App() {
     </AppProvider>
   );
 }
+

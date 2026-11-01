@@ -21,8 +21,23 @@ import {
   GradeAppealTicket,
   QuestionCommentItem,
   QuestionReportItem,
-  QuestionReportIssueType
+  QuestionReportIssueType,
+  ColorThemeId,
+  DarkModeSchedule,
+  AppNotificationItem,
+  AccountType,
+  StudentCustomQuiz,
+  UIDensityMode,
+  QuizBehaviorPreferences,
+  StudyBackupPayload
 } from '../types';
+import { buildCompleteLibraryFolders } from '../utils/customQuizAndLibraryLogic';
+import {
+  DEFAULT_QUIZ_PREFERENCES,
+  createStudyBackupPayload,
+  parseAndValidateStudyBackup
+} from '../utils/settingsAndDensityLogic';
+import { applyCommentUpdate } from '../utils/mediaAndOfflineLogic';
 import { 
   INITIAL_YEARS, 
   INITIAL_SUBJECTS, 
@@ -104,11 +119,18 @@ function safeLoadStorage<T>(key: string, fallback: T): T {
 interface AppContextType {
   user: UserProfile | null;
   isAdmin: boolean;
+  isGuest: boolean;
+  accountType: AccountType;
+  canToggleRole: boolean;
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
   darkMode: boolean;
   setDarkMode: (val: boolean | ((prev: boolean) => boolean)) => void;
   toggleDarkMode: () => void;
+  darkModeSchedule: DarkModeSchedule;
+  setDarkModeSchedule: (schedule: DarkModeSchedule) => void;
+  colorTheme: ColorThemeId;
+  setColorTheme: (theme: ColorThemeId) => void;
   activeSection: ActiveSection;
   setActiveSection: (sec: ActiveSection) => void;
   activeYear: AcademicYearId;
@@ -123,6 +145,21 @@ interface AppContextType {
   toggleEyeComfortMode: () => void;
   questionFontScale: 'normal' | 'large' | 'xlarge';
   setQuestionFontScale: (scale: 'normal' | 'large' | 'xlarge') => void;
+  uiDensity: UIDensityMode;
+  setUiDensity: (density: UIDensityMode) => void;
+  quizPreferences: QuizBehaviorPreferences;
+  updateQuizPreferences: (updates: Partial<QuizBehaviorPreferences>) => void;
+  exportStudyBackup: () => StudyBackupPayload;
+  importStudyBackup: (rawJson: string) => { valid: boolean; error?: string };
+
+  // Local Notifications & Firebase Read-State Sync
+  notifications: AppNotificationItem[];
+  readNotificationIds: string[];
+  unreadNotificationsCount: number;
+  activeToastNotification: AppNotificationItem | null;
+  dismissToastNotification: () => void;
+  markNotificationAsRead: (notificationId: string) => Promise<void>;
+  markAllNotificationsAsRead: () => Promise<void>;
 
   // Collections
   subjects: SubjectItem[];
@@ -134,8 +171,9 @@ interface AppContextType {
   discussions: DiscussionPost[];
   directMessages: DirectMessage[];
 
-  // Persona
+  // Persona & Temporary Isolated Accounts
   quickSwitchPersona: (role: 'admin' | 'student') => void;
+  switchAccount: (targetAccount: AccountType) => void;
 
   // Auth actions
   loginWithGoogle: (studentId: string, academicYear: string) => Promise<void>;
@@ -158,12 +196,27 @@ interface AppContextType {
   deleteQuestion: (id: string) => Promise<void>;
 
   // Library Folders & Files
-  addLibraryFolder: (folder: { name: string; parentId: string | null }) => Promise<void>;
+  addLibraryFolder: (folder: {
+    name: string;
+    parentId: string | null;
+    isSubject?: boolean;
+    subjectId?: string;
+    icon?: string;
+    department?: string;
+    coverColor?: string;
+    coverImage?: string;
+    coverLabel?: string;
+    semesterBadge?: '1' | '2';
+  }) => Promise<void>;
+  updateLibraryFolder: (folderId: string, updates: Partial<LibraryFolderItem>) => Promise<void>;
   renameLibraryFolder: (folderId: string, newName: string) => Promise<void>;
   deleteLibraryFolder: (folderId: string) => Promise<void>;
-  addLibraryFile: (item: Omit<LibraryFileItem, 'id'>) => Promise<void>;
+  moveLibraryFolder: (folderId: string, direction: 'up' | 'down') => Promise<void>;
+  addLibraryFile: (item: Omit<LibraryFileItem, 'id'>) => Promise<string>;
   updateLibraryFile: (id: string, updates: Partial<LibraryFileItem>) => Promise<void>;
   deleteLibraryFile: (id: string) => Promise<void>;
+  moveLibraryFile: (fileId: string, direction: 'up' | 'down') => Promise<void>;
+  togglePinLibraryFile: (fileId: string) => Promise<void>;
 
   // Marketplace
   addMarketplaceItem: (item: Omit<MarketplaceItem, 'id' | 'createdAt'>) => Promise<void>;
@@ -177,9 +230,12 @@ interface AppContextType {
   addVideoFolder: (folder: { name: string; parentId: string | null; subjectId?: string; yearId?: AcademicYearId; semester?: SemesterType }) => Promise<void>;
   renameVideoFolder: (folderId: string, newName: string) => Promise<void>;
   deleteVideoFolder: (folderId: string) => Promise<void>;
-  addVideo: (video: Omit<VideoItem, 'id' | 'viewsCount'>) => Promise<void>;
+  addVideo: (video: Omit<VideoItem, 'id' | 'viewsCount'>) => Promise<string>;
   updateVideo: (id: string, updates: Partial<VideoItem>) => Promise<void>;
   deleteVideo: (id: string) => Promise<void>;
+  moveVideo: (videoId: string, direction: 'up' | 'down') => Promise<void>;
+  togglePinVideo: (videoId: string) => Promise<void>;
+  purgeAllDemoData: () => Promise<void>;
 
   // Announcements
   addAnnouncement: (item: Omit<AnnouncementItem, 'id'>) => Promise<void>;
@@ -254,10 +310,14 @@ interface AppContextType {
   resetAllQuestionStatus: () => void;
   chapterLastIndex: Record<string, number>;
   setChapterQuestionIndex: (chapterId: string, index: number) => void;
+  studentCustomQuizzes: StudentCustomQuiz[];
+  saveStudentCustomQuiz: (quiz: StudentCustomQuiz) => void;
+  deleteStudentCustomQuiz: (quizId: string) => void;
 
   // Question Discussions & Reports (MedFur Advanced Module)
   questionComments: QuestionCommentItem[];
   addQuestionComment: (questionId: string, content: string) => Promise<void>;
+  updateQuestionComment: (commentId: string, newContent: string) => Promise<void>;
   deleteQuestionComment: (commentId: string) => Promise<void>;
   toggleLikeQuestionComment: (commentId: string) => Promise<void>;
   questionReports: QuestionReportItem[];
@@ -277,10 +337,25 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Dark mode by default is true for the dark academic theme unless explicitly set to light
+  // Dark mode Schedule ('manual' | 'system' | 'time')
+  const [darkModeSchedule, setDarkModeScheduleState] = useState<DarkModeSchedule>(() => {
+    const saved = localStorage.getItem('medfur_dark_schedule');
+    if (saved === 'system' || saved === 'time' || saved === 'manual') return saved;
+    return 'system';
+  });
+
+  // Dark mode by default is true or computed from schedule
   const [darkMode, setDarkMode] = useState<boolean>(() => {
+    const schedule = localStorage.getItem('medfur_dark_schedule') as DarkModeSchedule | null;
+    if (schedule === 'time') {
+      const hour = new Date().getHours();
+      return hour >= 18 || hour < 6;
+    }
     const saved = localStorage.getItem('uniportal_theme');
     if (saved) return saved === 'dark';
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
     return true;
   });
 
@@ -292,20 +367,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [darkMode]);
 
-  useEffect(() => {
-    // If no manual preference in localStorage, sync with system theme changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = (e: MediaQueryListEvent) => {
-      const saved = localStorage.getItem('uniportal_theme');
-      if (!saved) {
-        setDarkMode(e.matches);
-      }
-    };
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
-  }, []);
+  const setDarkModeSchedule = (schedule: DarkModeSchedule) => {
+    setDarkModeScheduleState(schedule);
+    localStorage.setItem('medfur_dark_schedule', schedule);
+    if (schedule === 'system' && typeof window !== 'undefined' && window.matchMedia) {
+      const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setDarkMode(isSystemDark);
+      localStorage.setItem('uniportal_theme', isSystemDark ? 'dark' : 'light');
+    } else if (schedule === 'time') {
+      const hour = new Date().getHours();
+      const isNight = hour >= 18 || hour < 6;
+      setDarkMode(isNight);
+      localStorage.setItem('uniportal_theme', isNight ? 'dark' : 'light');
+    }
+  };
 
   const toggleDarkMode = () => {
+    setDarkModeScheduleState('manual');
+    localStorage.setItem('medfur_dark_schedule', 'manual');
     setDarkMode(prev => {
       const next = !prev;
       localStorage.setItem('uniportal_theme', next ? 'dark' : 'light');
@@ -313,42 +392,125 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  // Default User: Dr. Mohammed Al-Kaysoum (matching Screenshot 1: د. محمد)
-  const [user, setUser] = useState<UserProfile | null>(() =>
-    safeLoadStorage<UserProfile | null>('uniportal_user_v3', {
-      uid: 'admin-uid-99',
-      email: ADMIN_EMAIL,
-      displayName: 'د. محمد',
-      lastName: 'الكيصوم',
-      studentId: 'ADMIN-001',
-      examNumber: 'ADMIN-01',
+  const buildAccountProfile = (type: AccountType, overrideRole?: 'admin' | 'student'): UserProfile => {
+    if (type === 'admin') {
+      const activeRole = overrideRole || 'admin';
+      return {
+        uid: 'admin-uid-99',
+        email: ADMIN_EMAIL,
+        displayName: activeRole === 'admin' ? 'المشرف الأكاديمي' : 'المشرف (معاينة كطالب)',
+        lastName: '',
+        studentId: 'ADMIN-001',
+        examNumber: 'ADMIN-01',
+        academicYear: 'السنة الثالثة',
+        yearBadge: '0',
+        batch: activeRole === 'admin' ? 'الإشراف الأكاديمي' : 'معاينة واجهة الطالب',
+        role: activeRole,
+        accountType: 'admin',
+        canToggleRole: true,
+        blockedUsers: [],
+        createdAt: new Date().toISOString()
+      };
+    }
+    if (type === 'student') {
+      return {
+        uid: 'student-uid-12',
+        email: 'student.med@univ.edu',
+        displayName: 'حساب الطالب التجريبي',
+        lastName: '',
+        studentId: '2024-30421',
+        examNumber: '30421',
+        academicYear: 'السنة الثالثة',
+        yearBadge: '3',
+        batch: 'كلية الطب البشري',
+        role: 'student',
+        accountType: 'student',
+        canToggleRole: false,
+        blockedUsers: [],
+        createdAt: new Date().toISOString()
+      };
+    }
+    return {
+      uid: 'guest-uid-00',
+      email: 'guest@medfur.edu',
+      displayName: 'زائر (وضع الضيف)',
+      lastName: '',
+      studentId: 'GUEST',
+      examNumber: '',
       academicYear: 'السنة الثالثة',
       yearBadge: '0',
-      batch: 'إشراف أكاديمي',
-      role: 'admin',
+      batch: 'تصفح وتجربة الأتمتة',
+      role: 'guest',
+      accountType: 'guest',
+      canToggleRole: false,
       blockedUsers: [],
       createdAt: new Date().toISOString()
-    })
-  );
+    };
+  };
+
+  // Default User: Clean Supervisor Account with Role Toggle enabled
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    const loaded = safeLoadStorage<UserProfile | null>('medfur_clean_user_v8', null);
+    if (loaded && loaded.accountType) {
+      return loaded;
+    }
+    return buildAccountProfile('admin', 'admin');
+  });
+
+  const accountType: AccountType = user?.accountType || (user?.role === 'admin' ? 'admin' : user?.role === 'guest' ? 'guest' : 'student');
+  const isGuest: boolean = accountType === 'guest' || user?.role === 'guest' || !user;
+  const canToggleRole: boolean = Boolean(user?.canToggleRole || accountType === 'admin');
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Navigation
   const [activeSection, setActiveSection] = useState<ActiveSection>('home');
-  const [activeYear, setActiveYear] = useState<AcademicYearId>('year-3'); // default year 3 matching screenshot
+  const [activeYear, setActiveYear] = useState<AcademicYearId>('year-3');
   const [activeSemester, setActiveSemester] = useState<SemesterType>('first');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
 
-  // Study & Eye Comfort Preferences
+  // Study, Eye Comfort & Vibrant Multi-Color Theme Preferences
   const [eyeComfortMode, setEyeComfortMode] = useState<boolean>(() => {
     return localStorage.getItem('uniportal_eye_comfort') === 'true';
   });
+
+  const [colorTheme, setColorThemeState] = useState<ColorThemeId>(() => {
+    const saved = localStorage.getItem('medfur_color_theme') as ColorThemeId | null;
+    if (saved && ['emerald', 'sky', 'orange', 'purple', 'rose'].includes(saved)) {
+      return saved;
+    }
+    return 'emerald';
+  });
+
   const [questionFontScale, setQuestionFontScaleState] = useState<'normal' | 'large' | 'xlarge'>(() => {
     const saved = localStorage.getItem('uniportal_font_scale');
     if (saved === 'large' || saved === 'xlarge') return saved;
     return 'normal';
   });
+
+  const [uiDensity, setUiDensityState] = useState<UIDensityMode>(() => {
+    const saved = localStorage.getItem('medfur_ui_density');
+    if (saved === 'compact' || saved === 'balanced') return saved;
+    return 'balanced';
+  });
+
+  const [quizPreferences, setQuizPreferencesState] = useState<QuizBehaviorPreferences>(() => {
+    const saved = safeLoadStorage<Partial<QuizBehaviorPreferences>>('medfur_quiz_prefs_v1', {});
+    return {
+      ...DEFAULT_QUIZ_PREFERENCES,
+      ...saved,
+    };
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-density', uiDensity);
+    if (uiDensity === 'compact') {
+      document.documentElement.classList.add('density-compact');
+    } else {
+      document.documentElement.classList.remove('density-compact');
+    }
+  }, [uiDensity]);
 
   useEffect(() => {
     if (eyeComfortMode) {
@@ -358,6 +520,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [eyeComfortMode]);
 
+  useEffect(() => {
+    // Ensure any legacy Royal Mode keys or classes are permanently removed
+    document.documentElement.classList.remove('royal-mode');
+    try {
+      localStorage.removeItem('medfur_royal_mode');
+      localStorage.removeItem('uniportal_royal_mode');
+    } catch {
+      // ignore
+    }
+    document.documentElement.setAttribute('data-color-theme', colorTheme);
+  }, [colorTheme]);
+
+  // One-time cleanup of old mock localStorage keys
+  useEffect(() => {
+    const legacyKeys = [
+      'uniportal_user_v3',
+      'uniportal_subjects_v6',
+      'uniportal_questions_v6',
+      'uniportal_folders_v3',
+      'uniportal_libfiles_v3',
+      'uniportal_market_v3',
+      'uniportal_announcements_v3',
+      'uniportal_videofolders_v4',
+      'uniportal_videos_v5',
+      'uniportal_discussions_v3',
+      'uniportal_direct_msgs_v3',
+      'uniportal_channels_v4',
+      'uniportal_comm_msgs_v4',
+      'uniportal_grades_v5',
+      'uniportal_leaderboard_v5',
+      'uniportal_appeals_v5',
+      'medfur_q_comments_v1',
+      'medfur_q_reports_v1',
+    ];
+    try {
+      legacyKeys.forEach((k) => localStorage.removeItem(k));
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const toggleEyeComfortMode = () => {
     setEyeComfortMode(prev => {
       const next = !prev;
@@ -366,244 +569,269 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const setColorTheme = (theme: ColorThemeId) => {
+    setColorThemeState(theme);
+    localStorage.setItem('medfur_color_theme', theme);
+  };
+
   const setQuestionFontScale = (scale: 'normal' | 'large' | 'xlarge') => {
     setQuestionFontScaleState(scale);
     localStorage.setItem('uniportal_font_scale', scale);
   };
 
-  // Collections state
+  const setUiDensity = (density: UIDensityMode) => {
+    setUiDensityState(density);
+    localStorage.setItem('medfur_ui_density', density);
+  };
+
+  const updateQuizPreferences = (updates: Partial<QuizBehaviorPreferences>) => {
+    setQuizPreferencesState(prev => {
+      const next = { ...prev, ...updates };
+      try {
+        localStorage.setItem('medfur_quiz_prefs_v1', JSON.stringify(next));
+      } catch {
+        // ignore storage errors
+      }
+      return next;
+    });
+  };
+
+  // Collections state (clean v7 keys with zero demo data)
   const [subjects, setSubjects] = useState<SubjectItem[]>(() =>
-    safeLoadStorage('uniportal_subjects_v6', INITIAL_SUBJECTS)
+    safeLoadStorage('medfur_clean_subjects_v7', INITIAL_SUBJECTS)
   );
 
   const [questions, setQuestions] = useState<QuestionItem[]>(() =>
-    safeLoadStorage('uniportal_questions_v6', INITIAL_QUESTIONS)
+    safeLoadStorage('medfur_clean_questions_v7', INITIAL_QUESTIONS)
   );
 
-  const [libraryFolders, setLibraryFolders] = useState<LibraryFolderItem[]>(() =>
-    safeLoadStorage('uniportal_folders_v3', INITIAL_LIBRARY_FOLDERS)
-  );
+  const [libraryFolders, setLibraryFolders] = useState<LibraryFolderItem[]>(() => {
+    const saved = safeLoadStorage<LibraryFolderItem[]>('medfur_clean_folders_v8', []);
+    return buildCompleteLibraryFolders(INITIAL_SUBJECTS, saved);
+  });
 
   const [libraryFiles, setLibraryFiles] = useState<LibraryFileItem[]>(() =>
-    safeLoadStorage('uniportal_libfiles_v3', INITIAL_LIBRARY_FILES)
+    safeLoadStorage('medfur_clean_libfiles_v7', INITIAL_LIBRARY_FILES)
   );
 
   const [marketplaceItems, setMarketplaceItems] = useState<MarketplaceItem[]>(() =>
-    safeLoadStorage('uniportal_market_v3', INITIAL_MARKETPLACE)
+    safeLoadStorage('medfur_clean_market_v7', INITIAL_MARKETPLACE)
   );
 
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(() =>
-    safeLoadStorage('uniportal_announcements_v3', INITIAL_ANNOUNCEMENTS)
+    safeLoadStorage('medfur_clean_announcements_v7', INITIAL_ANNOUNCEMENTS)
   );
 
-  // Video Folders Tree (matching Library Folders)
   const [videoFolders, setVideoFolders] = useState<VideoFolderItem[]>(() =>
-    safeLoadStorage('uniportal_videofolders_v4', INITIAL_VIDEO_FOLDERS)
+    safeLoadStorage('medfur_clean_videofolders_v7', INITIAL_VIDEO_FOLDERS)
   );
 
-  // Videos (clean reset - no mock data)
   const [videos, setVideos] = useState<VideoItem[]>(() =>
-    safeLoadStorage('uniportal_videos_v5', INITIAL_VIDEOS)
+    safeLoadStorage('medfur_clean_videos_v7', INITIAL_VIDEOS)
   );
 
   const [discussions, setDiscussions] = useState<DiscussionPost[]>(() =>
-    safeLoadStorage('uniportal_discussions_v3', [])
+    safeLoadStorage('medfur_clean_discussions_v7', [])
   );
 
   const [directMessages, setDirectMessages] = useState<DirectMessage[]>(() =>
-    safeLoadStorage('uniportal_direct_msgs_v3', [])
+    safeLoadStorage('medfur_clean_direct_msgs_v7', [])
   );
 
-  // Telegram-like Community Channels & Messages (clean reset - includes supervisors channel)
   const [channels, setChannels] = useState<ChannelInfo[]>(() =>
-    safeLoadStorage('uniportal_channels_v4', INITIAL_CHANNELS)
+    safeLoadStorage('medfur_clean_channels_v7', INITIAL_CHANNELS)
   );
   const [activeChannelId, setActiveChannelId] = useState<string>('general');
   const [communityMessages, setCommunityMessages] = useState<import('../types').CommunityMessage[]>(() =>
-    safeLoadStorage('uniportal_comm_msgs_v4', INITIAL_COMMUNITY_MESSAGES)
+    safeLoadStorage('medfur_clean_comm_msgs_v7', INITIAL_COMMUNITY_MESSAGES)
   );
   const [joinRequests, setJoinRequests] = useState<import('../types').ChannelJoinRequest[]>(() =>
-    safeLoadStorage('uniportal_join_reqs_v3', [])
+    safeLoadStorage('medfur_clean_join_reqs_v7', [])
   );
   const [blockedUsers, setBlockedUsers] = useState<string[]>(() =>
-    safeLoadStorage('uniportal_blocked_v3', [])
+    safeLoadStorage('medfur_clean_blocked_v7', [])
   );
 
-  // Grades & Leaderboard System (Percentage only)
   const [grades, setGrades] = useState<GradeItem[]>(() =>
-    safeLoadStorage('uniportal_grades_v5', INITIAL_GRADES)
+    safeLoadStorage('medfur_clean_grades_v7', INITIAL_GRADES)
   );
   const [leaderboard, setLeaderboard] = useState<StudentLeaderboardEntry[]>(() =>
-    safeLoadStorage('uniportal_leaderboard_v5', INITIAL_LEADERBOARD)
+    safeLoadStorage('medfur_clean_leaderboard_v7', INITIAL_LEADERBOARD)
   );
   const [gradeAppeals, setGradeAppeals] = useState<GradeAppealTicket[]>(() =>
-    safeLoadStorage('uniportal_appeals_v5', INITIAL_GRADE_APPEALS)
+    safeLoadStorage('medfur_clean_appeals_v7', INITIAL_GRADE_APPEALS)
   );
 
-  // Enhanced Automation Bank State
+  // Helper for Account-Isolated Statistics Storage Keys
+  const getAccountScopedKey = (acct: AccountType, keySuffix: string) => `medfur_v8_${acct}_${keySuffix}`;
+
+  // Enhanced Automation Bank State (Strictly isolated per accountType: admin / student / guest)
   const [savedQuestionIds, setSavedQuestionIds] = useState<string[]>(() =>
-    safeLoadStorage('uniportal_saved_qids', [])
+    safeLoadStorage(getAccountScopedKey(accountType, 'saved_qids'), [])
   );
   const [questionNotes, setQuestionNotes] = useState<Record<string, string>>(() =>
-    safeLoadStorage('uniportal_q_notes', {})
+    safeLoadStorage(getAccountScopedKey(accountType, 'q_notes'), {})
   );
   const [wrongQuestionIds, setWrongQuestionIds] = useState<string[]>(() =>
-    safeLoadStorage('uniportal_wrong_qids', [])
+    safeLoadStorage(getAccountScopedKey(accountType, 'wrong_qids'), [])
   );
   const [solvedQuestions, setSolvedQuestions] = useState<Record<string, { chosenOption: number; isCorrect: boolean }>>(() =>
-    safeLoadStorage('uniportal_solved_qs', {})
+    safeLoadStorage(getAccountScopedKey(accountType, 'solved_qs'), {})
   );
   const [chapterLastIndex, setChapterLastIndex] = useState<Record<string, number>>(() =>
-    safeLoadStorage('uniportal_chapter_last_idx', {})
+    safeLoadStorage(getAccountScopedKey(accountType, 'chapter_last_idx'), {})
+  );
+  const [studentCustomQuizzes, setStudentCustomQuizzes] = useState<StudentCustomQuiz[]>(() =>
+    safeLoadStorage(getAccountScopedKey(accountType, 'custom_quizzes'), [])
   );
 
   // MedFur Question Discussions & Reports State
   const [questionComments, setQuestionComments] = useState<QuestionCommentItem[]>(() =>
-    safeLoadStorage('medfur_q_comments_v1', INITIAL_QUESTION_COMMENTS)
+    safeLoadStorage('medfur_clean_q_comments_v7', INITIAL_QUESTION_COMMENTS)
   );
 
   const [questionReports, setQuestionReports] = useState<QuestionReportItem[]>(() =>
-    safeLoadStorage('medfur_q_reports_v1', INITIAL_QUESTION_REPORTS)
+    safeLoadStorage('medfur_clean_q_reports_v7', INITIAL_QUESTION_REPORTS)
   );
 
   // Direct Peer-to-Peer Chat
   const [activeChatPartner, setActiveChatPartner] = useState<{ uid: string; displayName: string; email?: string } | null>(null);
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
 
-  // Sync to local storage
+  // Sync to local storage safely
   useEffect(() => {
-    localStorage.setItem('uniportal_subjects_v6', JSON.stringify(subjects));
+    try { localStorage.setItem('medfur_clean_subjects_v7', JSON.stringify(subjects)); } catch { /* quota safe */ }
   }, [subjects]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_questions_v6', JSON.stringify(questions));
+    try { localStorage.setItem('medfur_clean_questions_v7', JSON.stringify(questions)); } catch { /* quota safe */ }
   }, [questions]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_folders_v3', JSON.stringify(libraryFolders));
+    try { localStorage.setItem('medfur_clean_folders_v8', JSON.stringify(libraryFolders)); } catch { /* quota safe */ }
   }, [libraryFolders]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_libfiles_v3', JSON.stringify(libraryFiles));
+    try { localStorage.setItem('medfur_clean_libfiles_v7', JSON.stringify(libraryFiles)); } catch { /* quota safe */ }
   }, [libraryFiles]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_market_v3', JSON.stringify(marketplaceItems));
+    try { localStorage.setItem('medfur_clean_market_v7', JSON.stringify(marketplaceItems)); } catch { /* quota safe */ }
   }, [marketplaceItems]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_announcements_v3', JSON.stringify(announcements));
+    try { localStorage.setItem('medfur_clean_announcements_v7', JSON.stringify(announcements)); } catch { /* quota safe */ }
   }, [announcements]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_discussions_v3', JSON.stringify(discussions));
+    try { localStorage.setItem('medfur_clean_discussions_v7', JSON.stringify(discussions)); } catch { /* quota safe */ }
   }, [discussions]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_direct_msgs_v3', JSON.stringify(directMessages));
+    try { localStorage.setItem('medfur_clean_direct_msgs_v7', JSON.stringify(directMessages)); } catch { /* quota safe */ }
   }, [directMessages]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_videofolders_v4', JSON.stringify(videoFolders));
+    try { localStorage.setItem('medfur_clean_videofolders_v7', JSON.stringify(videoFolders)); } catch { /* quota safe */ }
   }, [videoFolders]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_videos_v5', JSON.stringify(videos));
+    try { localStorage.setItem('medfur_clean_videos_v7', JSON.stringify(videos)); } catch { /* quota safe */ }
   }, [videos]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_channels_v4', JSON.stringify(channels));
+    try { localStorage.setItem('medfur_clean_channels_v7', JSON.stringify(channels)); } catch { /* quota safe */ }
   }, [channels]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_comm_msgs_v4', JSON.stringify(communityMessages));
+    try { localStorage.setItem('medfur_clean_comm_msgs_v7', JSON.stringify(communityMessages)); } catch { /* quota safe */ }
   }, [communityMessages]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_join_reqs_v3', JSON.stringify(joinRequests));
+    try { localStorage.setItem('medfur_clean_join_reqs_v7', JSON.stringify(joinRequests)); } catch { /* quota safe */ }
   }, [joinRequests]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_blocked_v3', JSON.stringify(blockedUsers));
+    try { localStorage.setItem('medfur_clean_blocked_v7', JSON.stringify(blockedUsers)); } catch { /* quota safe */ }
   }, [blockedUsers]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_saved_qids', JSON.stringify(savedQuestionIds));
-  }, [savedQuestionIds]);
+    try { localStorage.setItem(getAccountScopedKey(accountType, 'saved_qids'), JSON.stringify(savedQuestionIds)); } catch { /* quota safe */ }
+  }, [savedQuestionIds, accountType]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_q_notes', JSON.stringify(questionNotes));
-  }, [questionNotes]);
+    try { localStorage.setItem(getAccountScopedKey(accountType, 'q_notes'), JSON.stringify(questionNotes)); } catch { /* quota safe */ }
+  }, [questionNotes, accountType]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_wrong_qids', JSON.stringify(wrongQuestionIds));
-  }, [wrongQuestionIds]);
+    try { localStorage.setItem(getAccountScopedKey(accountType, 'wrong_qids'), JSON.stringify(wrongQuestionIds)); } catch { /* quota safe */ }
+  }, [wrongQuestionIds, accountType]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_solved_qs', JSON.stringify(solvedQuestions));
-  }, [solvedQuestions]);
+    try { localStorage.setItem(getAccountScopedKey(accountType, 'solved_qs'), JSON.stringify(solvedQuestions)); } catch { /* quota safe */ }
+  }, [solvedQuestions, accountType]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_chapter_last_idx', JSON.stringify(chapterLastIndex));
-  }, [chapterLastIndex]);
+    try { localStorage.setItem(getAccountScopedKey(accountType, 'chapter_last_idx'), JSON.stringify(chapterLastIndex)); } catch { /* quota safe */ }
+  }, [chapterLastIndex, accountType]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_grades_v5', JSON.stringify(grades));
+    try { localStorage.setItem(getAccountScopedKey(accountType, 'custom_quizzes'), JSON.stringify(studentCustomQuizzes)); } catch { /* quota safe */ }
+  }, [studentCustomQuizzes, accountType]);
+
+  useEffect(() => {
+    try { localStorage.setItem('medfur_clean_grades_v7', JSON.stringify(grades)); } catch { /* quota safe */ }
   }, [grades]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_leaderboard_v5', JSON.stringify(leaderboard));
+    try { localStorage.setItem('medfur_clean_leaderboard_v7', JSON.stringify(leaderboard)); } catch { /* quota safe */ }
   }, [leaderboard]);
 
   useEffect(() => {
-    localStorage.setItem('uniportal_appeals_v5', JSON.stringify(gradeAppeals));
+    try { localStorage.setItem('medfur_clean_appeals_v7', JSON.stringify(gradeAppeals)); } catch { /* quota safe */ }
   }, [gradeAppeals]);
 
   useEffect(() => {
-    localStorage.setItem('medfur_q_comments_v1', JSON.stringify(questionComments));
+    try { localStorage.setItem('medfur_clean_q_comments_v7', JSON.stringify(questionComments)); } catch { /* quota safe */ }
   }, [questionComments]);
 
   useEffect(() => {
-    localStorage.setItem('medfur_q_reports_v1', JSON.stringify(questionReports));
+    try { localStorage.setItem('medfur_clean_q_reports_v7', JSON.stringify(questionReports)); } catch { /* quota safe */ }
   }, [questionReports]);
 
-  const isAdmin = user?.role === 'admin' || user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const isAdmin = user?.role === 'admin';
 
+  // Switch between the 3 isolated temporary accounts (Admin, Standalone Student, Guest)
+  const switchAccount = (targetAccount: AccountType) => {
+    const nextProfile = buildAccountProfile(targetAccount, targetAccount === 'admin' ? 'admin' : undefined);
+    setUser(nextProfile);
+    try {
+      localStorage.setItem('medfur_clean_user_v8', JSON.stringify(nextProfile));
+    } catch {
+      // ignore
+    }
+    // Load the target account's isolated automation statistics & notification read states
+    setSavedQuestionIds(safeLoadStorage(getAccountScopedKey(targetAccount, 'saved_qids'), []));
+    setQuestionNotes(safeLoadStorage(getAccountScopedKey(targetAccount, 'q_notes'), {}));
+    setWrongQuestionIds(safeLoadStorage(getAccountScopedKey(targetAccount, 'wrong_qids'), []));
+    setSolvedQuestions(safeLoadStorage(getAccountScopedKey(targetAccount, 'solved_qs'), {}));
+    setChapterLastIndex(safeLoadStorage(getAccountScopedKey(targetAccount, 'chapter_last_idx'), {}));
+    setStudentCustomQuizzes(safeLoadStorage(getAccountScopedKey(targetAccount, 'custom_quizzes'), []));
+    setReadNotificationIds(safeLoadStorage(getAccountScopedKey(targetAccount, 'read_notifs'), []));
+  };
+
+  // Inside the Admin account ONLY: toggle between Admin mode and Student Preview mode
   const quickSwitchPersona = (role: 'admin' | 'student') => {
-    if (role === 'admin') {
-      const adminProfile: UserProfile = {
-        uid: 'admin-uid-99',
-        email: ADMIN_EMAIL,
-        displayName: 'د. محمد',
-        lastName: 'الكيصوم',
-        studentId: 'ADMIN-001',
-        examNumber: 'ADMIN-01',
-        academicYear: 'السنة الثالثة',
-        yearBadge: '0',
-        batch: 'إشراف أكاديمي',
-        role: 'admin',
-        blockedUsers: [],
-        createdAt: new Date().toISOString()
-      };
-      setUser(adminProfile);
-      localStorage.setItem('uniportal_user_v3', JSON.stringify(adminProfile));
+    if (accountType === 'admin' || canToggleRole) {
+      const toggledAdminProfile = buildAccountProfile('admin', role);
+      setUser(toggledAdminProfile);
+      try {
+        localStorage.setItem('medfur_clean_user_v8', JSON.stringify(toggledAdminProfile));
+      } catch {
+        // ignore
+      }
     } else {
-      const studentProfile: UserProfile = {
-        uid: 'student-uid-12',
-        email: 'student.med@univ.edu',
-        displayName: 'أحمد',
-        lastName: 'الكيصوم',
-        studentId: '2024-10492',
-        examNumber: '30421',
-        academicYear: 'السنة الثالثة',
-        yearBadge: '3',
-        batch: 'دفعة 30',
-        role: 'student',
-        blockedUsers: [],
-        createdAt: new Date().toISOString()
-      };
-      setUser(studentProfile);
-      localStorage.setItem('uniportal_user_v3', JSON.stringify(studentProfile));
+      switchAccount(role);
     }
   };
 
@@ -652,10 +880,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         academicYear: academicYear,
         batch: 'دفعة 30',
         role: isAdm ? 'admin' : 'student',
+        accountType: isAdm ? 'admin' : 'student',
+        canToggleRole: isAdm,
         createdAt: new Date().toISOString(),
       };
       setUser(profile);
-      localStorage.setItem('uniportal_user_v3', JSON.stringify(profile));
+      localStorage.setItem('medfur_clean_user_v8', JSON.stringify(profile));
       setIsAuthModalOpen(false);
     } catch (err: unknown) {
       console.error('Email login error:', err);
@@ -669,15 +899,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch {
       // fallback
     }
-    setUser(null);
-    localStorage.removeItem('uniportal_user_v3');
+    switchAccount('guest');
   };
 
   const updateUserProfile = (profileUpdates: Partial<UserProfile>) => {
     if (!user) return;
     const updated = { ...user, ...profileUpdates };
     setUser(updated);
-    localStorage.setItem('uniportal_user_v3', JSON.stringify(updated));
+    localStorage.setItem('medfur_clean_user_v8', JSON.stringify(updated));
   };
 
   // Subjects & Chapters
@@ -881,14 +1110,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Library Folders & Files
-  const addLibraryFolder = async (folder: { name: string; parentId: string | null }) => {
+  const addLibraryFolder = async (folder: {
+    name: string;
+    parentId: string | null;
+    isSubject?: boolean;
+    subjectId?: string;
+    icon?: string;
+    department?: string;
+    coverColor?: string;
+    coverImage?: string;
+    coverLabel?: string;
+    semesterBadge?: '1' | '2';
+  }) => {
+    const siblings = libraryFolders.filter((f) => f.parentId === folder.parentId);
+    const maxOrder = siblings.reduce((max, f, idx) => Math.max(max, f.orderIndex ?? idx + 1), 0);
     const newFld: LibraryFolderItem = {
       id: `fld-${Date.now()}`,
       name: folder.name.trim(),
       parentId: folder.parentId,
-      type: 'folder'
+      type: 'folder',
+      orderIndex: maxOrder + 1,
+      isSubject: folder.isSubject ?? false,
+      subjectId: folder.subjectId,
+      icon: folder.icon,
+      department: folder.department,
+      coverColor: folder.coverColor,
+      coverImage: folder.coverImage,
+      coverLabel: folder.coverLabel,
+      semesterBadge: folder.semesterBadge,
     };
     setLibraryFolders(prev => [...prev, newFld]);
+  };
+
+  const updateLibraryFolder = async (folderId: string, updates: Partial<LibraryFolderItem>) => {
+    setLibraryFolders(prev =>
+      prev.map(f => (f.id === folderId ? { ...f, ...updates, name: updates.name ? updates.name.trim() : f.name } : f))
+    );
   };
 
   const renameLibraryFolder = async (folderId: string, newName: string) => {
@@ -896,27 +1153,298 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteLibraryFolder = async (folderId: string) => {
-    // Delete folder and all its child folders/files
     setLibraryFolders(prev => prev.filter(f => f.id !== folderId && f.parentId !== folderId));
     setLibraryFiles(prev => prev.filter(f => f.folderId !== folderId));
   };
 
-  const addLibraryFile = async (item: Omit<LibraryFileItem, 'id'>) => {
+  const moveLibraryFolder = async (folderId: string, direction: 'up' | 'down') => {
+    setLibraryFolders(prev => {
+      const target = prev.find(f => f.id === folderId);
+      if (!target) return prev;
+      const siblings = prev
+        .filter(f => f.parentId === target.parentId)
+        .sort((a, b) => (a.orderIndex ?? 9999) - (b.orderIndex ?? 9999));
+      const idx = siblings.findIndex(f => f.id === folderId);
+      if (idx === -1) return prev;
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= siblings.length) return prev;
+
+      const reordered = [...siblings];
+      const [moved] = reordered.splice(idx, 1);
+      reordered.splice(swapIdx, 0, moved);
+
+      const orderMap = new Map<string, number>();
+      reordered.forEach((item, i) => orderMap.set(item.id, i + 1));
+
+      return prev.map(f =>
+        orderMap.has(f.id) ? { ...f, orderIndex: orderMap.get(f.id)! } : f
+      );
+    });
+  };
+
+  // Local Notifications & Firebase Read-State Sync (Isolated per accountType)
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>(() =>
+    safeLoadStorage<string[]>(getAccountScopedKey(accountType, 'read_notifs'), [])
+  );
+  const [customNotifications, setCustomNotifications] = useState<AppNotificationItem[]>(() =>
+    safeLoadStorage<AppNotificationItem[]>('medfur_custom_notifications_v1', [])
+  );
+  const [activeToastNotification, setActiveToastNotification] = useState<AppNotificationItem | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(getAccountScopedKey(accountType, 'read_notifs'), JSON.stringify(readNotificationIds));
+    } catch {
+      // ignore
+    }
+  }, [readNotificationIds, accountType]);
+
+  useEffect(() => {
+    localStorage.setItem('medfur_custom_notifications_v1', JSON.stringify(customNotifications));
+  }, [customNotifications]);
+
+  // Real-time Firebase sync for user read notifications
+  useEffect(() => {
+    const currentAuthUid = auth.currentUser?.uid || user?.uid;
+    if (!currentAuthUid) return;
+
+    const notifDocRef = doc(db, 'user_notifications', currentAuthUid);
+    const unsubscribe = onSnapshot(
+      notifDocRef,
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (Array.isArray(data.readNotificationIds)) {
+            setReadNotificationIds((prev) => {
+              const merged = Array.from(new Set([...prev, ...(data.readNotificationIds as string[])]));
+              return merged.slice(-500);
+            });
+          }
+        }
+      },
+      () => {
+        // Offline or guest persona fallback uses localStorage seamlessly
+      }
+    );
+
+    return () => unsubscribe();
+  }, [user?.uid]);
+
+  const syncReadNotificationsToFirebase = async (nextIds: string[]) => {
+    const boundedIds = nextIds.slice(-500);
+    const targetUid = auth.currentUser?.uid || user?.uid;
+    if (!targetUid) return;
+
+    try {
+      await setDoc(
+        doc(db, 'user_notifications', targetUid),
+        sanitizeForFirestore({
+          userId: targetUid,
+          readNotificationIds: boundedIds,
+          updatedAt: new Date().toISOString(),
+        }),
+        { merge: true }
+      );
+    } catch {
+      // Safe local storage fallback when unauthenticated in Firebase Auth
+    }
+  };
+
+  const triggerLocalNotification = (notif: AppNotificationItem) => {
+    setCustomNotifications((prev) => [notif, ...prev.filter((n) => n.id !== notif.id)].slice(0, 60));
+    setActiveToastNotification(notif);
+
+    // Optional Web Notification API if granted
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(notif.title, { body: notif.message, icon: '/pwa-192x192.png' });
+      } catch {
+        // Ignore in restricted iframe
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!activeToastNotification) return;
+    const timer = setTimeout(() => {
+      setActiveToastNotification(null);
+    }, 5500);
+    return () => clearTimeout(timer);
+  }, [activeToastNotification]);
+
+  const dismissToastNotification = () => setActiveToastNotification(null);
+
+  // Combine custom real-time notifications with recent Announcements and Library Files
+  const notifications: AppNotificationItem[] = React.useMemo(() => {
+    const map = new Map<string, AppNotificationItem>();
+
+    customNotifications.forEach((n) => {
+      map.set(n.id, { ...n, isRead: readNotificationIds.includes(n.id) });
+    });
+
+    announcements.slice(0, 12).forEach((ann, idx) => {
+      const id = `notif-ann-${ann.id}`;
+      if (!map.has(id)) {
+        map.set(id, {
+          id,
+          title: `إعلان جديد: ${ann.title}`,
+          message: `${ann.category} • ${ann.content.slice(0, 90)}${ann.content.length > 90 ? '...' : ''}`,
+          category: 'announcement',
+          targetSection: 'announcements',
+          createdAt: ann.date || 'مؤخراً',
+          timestamp: Date.now() - (idx + 1) * 60000,
+          isRead: readNotificationIds.includes(id),
+        });
+      }
+    });
+
+    libraryFiles.slice(0, 12).forEach((file, idx) => {
+      const id = `notif-lib-${file.id}`;
+      if (!map.has(id)) {
+        map.set(id, {
+          id,
+          title: `ملف جديد في المكتبة: ${file.title}`,
+          message: `${file.fileType} • إعداد: ${file.author} (${file.fileSize})`,
+          category: 'library',
+          targetSection: 'library',
+          createdAt: file.date || 'مؤخراً',
+          timestamp: Date.now() - (idx + 15) * 60000,
+          isRead: readNotificationIds.includes(id),
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.timestamp - a.timestamp);
+  }, [customNotifications, announcements, libraryFiles, readNotificationIds]);
+
+  const unreadNotificationsCount = React.useMemo(
+    () => notifications.filter((n) => !readNotificationIds.includes(n.id)).length,
+    [notifications, readNotificationIds]
+  );
+
+  const markNotificationAsRead = async (notificationId: string) => {
+    if (readNotificationIds.includes(notificationId)) return;
+    const next = Array.from(new Set([...readNotificationIds, notificationId])).slice(-500);
+    setReadNotificationIds(next);
+    await syncReadNotificationsToFirebase(next);
+  };
+
+  const markAllNotificationsAsRead = async () => {
+    const allIds = notifications.map((n) => n.id);
+    const next = Array.from(new Set([...readNotificationIds, ...allIds])).slice(-500);
+    setReadNotificationIds(next);
+    await syncReadNotificationsToFirebase(next);
+  };
+
+  const addLibraryFile = async (item: Omit<LibraryFileItem, 'id'>): Promise<string> => {
+    const siblings = libraryFiles.filter(f => f.folderId === item.folderId);
+    const minOrder = siblings.reduce((min, f, idx) => Math.min(min, f.orderIndex ?? idx + 1), 1);
+    const newFileId = `lib-${Date.now()}`;
     const newFile: LibraryFileItem = {
       ...item,
-      id: `lib-${Date.now()}`,
+      id: newFileId,
       downloadsCount: 0,
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
+      orderIndex: item.orderIndex ?? Math.max(1, minOrder),
+      isPinned: item.isPinned ?? false,
     };
-    setLibraryFiles(prev => [newFile, ...prev]);
+    setLibraryFiles(prev => {
+      // Shift existing unpinned files in the same folder down by 1 so the newest appears cleanly
+      const updated = prev.map((f, i) =>
+        f.folderId === item.folderId
+          ? { ...f, orderIndex: (f.orderIndex ?? i + 1) + 1 }
+          : f
+      );
+      return [newFile, ...updated];
+    });
+
+    triggerLocalNotification({
+      id: `notif-lib-${newFile.id}`,
+      title: `تمت إضافة ملف جديد في المكتبة`,
+      message: `${newFile.title} (${newFile.fileType} • ${newFile.fileSize})`,
+      category: 'library',
+      targetSection: 'library',
+      createdAt: 'الآن',
+      timestamp: Date.now(),
+      isRead: false,
+    });
+
+    try {
+      // Avoid sending huge base64 strings (>800KB) to Firestore document
+      const firestoreSafeCopy = {
+        ...newFile,
+        downloadUrl:
+          newFile.downloadUrl && newFile.downloadUrl.length > 700000
+            ? undefined
+            : newFile.downloadUrl,
+      };
+      await setDoc(doc(db, 'library_items', newFile.id), sanitizeForFirestore(firestoreSafeCopy));
+    } catch {
+      // safe fallback
+    }
+
+    return newFileId;
   };
 
   const updateLibraryFile = async (id: string, updates: Partial<LibraryFileItem>) => {
     setLibraryFiles(prev => prev.map(f => f.id === id ? { ...f, ...updates } : f));
+    try {
+      const firestoreSafeUpdates = {
+        ...updates,
+        downloadUrl:
+          updates.downloadUrl && updates.downloadUrl.length > 700000
+            ? undefined
+            : updates.downloadUrl,
+      };
+      await updateDoc(doc(db, 'library_items', id), sanitizeForFirestore(firestoreSafeUpdates) as Record<string, unknown>);
+    } catch {
+      // safe fallback
+    }
   };
 
   const deleteLibraryFile = async (id: string) => {
     setLibraryFiles(prev => prev.filter(f => f.id !== id));
+    try {
+      await deleteDoc(doc(db, 'library_items', id));
+    } catch {
+      // safe fallback
+    }
+  };
+
+  const moveLibraryFile = async (fileId: string, direction: 'up' | 'down') => {
+    setLibraryFiles(prev => {
+      const target = prev.find(f => f.id === fileId);
+      if (!target) return prev;
+      const siblings = prev
+        .filter(f => f.folderId === target.folderId)
+        .sort((a, b) => {
+          if (Boolean(b.isPinned) !== Boolean(a.isPinned)) {
+            return b.isPinned ? 1 : -1;
+          }
+          return (a.orderIndex ?? 9999) - (b.orderIndex ?? 9999);
+        });
+      const idx = siblings.findIndex(f => f.id === fileId);
+      if (idx === -1) return prev;
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= siblings.length) return prev;
+
+      const reordered = [...siblings];
+      const [moved] = reordered.splice(idx, 1);
+      reordered.splice(swapIdx, 0, moved);
+
+      const orderMap = new Map<string, number>();
+      reordered.forEach((item, i) => orderMap.set(item.id, i + 1));
+
+      return prev.map(f =>
+        orderMap.has(f.id) ? { ...f, orderIndex: orderMap.get(f.id)! } : f
+      );
+    });
+  };
+
+  const togglePinLibraryFile = async (fileId: string) => {
+    setLibraryFiles(prev =>
+      prev.map(f => (f.id === fileId ? { ...f, isPinned: !f.isPinned } : f))
+    );
   };
 
   // Marketplace
@@ -955,6 +1483,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `ann-${Date.now()}`
     };
     setAnnouncements(prev => [newAnn, ...prev]);
+
+    triggerLocalNotification({
+      id: `notif-ann-${newAnn.id}`,
+      title: `إعلان جديد من الكلية (${newAnn.category})`,
+      message: newAnn.title,
+      category: 'announcement',
+      targetSection: 'announcements',
+      createdAt: 'الآن',
+      timestamp: Date.now(),
+      isRead: false,
+    });
+
+    try {
+      await setDoc(doc(db, 'announcements', newAnn.id), sanitizeForFirestore(newAnn));
+    } catch {
+      // safe fallback
+    }
   };
 
   const updateAnnouncement = async (id: string, updates: Partial<AnnouncementItem>) => {
@@ -987,14 +1532,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setVideos(prev => prev.filter(v => v.folderId !== folderId));
   };
 
-  const addVideo = async (video: Omit<VideoItem, 'id' | 'viewsCount'>) => {
+  const addVideo = async (video: Omit<VideoItem, 'id' | 'viewsCount'>): Promise<string> => {
+    const newVidId = `vid-${Date.now()}`;
+    const siblings = videos.filter(v => v.subjectId === video.subjectId);
+    const maxOrder = siblings.reduce((max, v, idx) => Math.max(max, v.orderIndex ?? idx + 1), 0);
     const newVid: VideoItem = {
       ...video,
-      id: `vid-${Date.now()}`,
-      viewsCount: 1,
-      uploadedAt: 'الآن'
+      id: newVidId,
+      viewsCount: 0,
+      uploadedAt: new Date().toISOString().split('T')[0],
+      orderIndex: video.orderIndex ?? maxOrder + 1,
+      isPinned: video.isPinned ?? false,
     };
-    setVideos(prev => [newVid, ...prev]);
+    setVideos(prev => [...prev, newVid]);
+    return newVidId;
   };
 
   const updateVideo = async (id: string, updates: Partial<VideoItem>) => {
@@ -1005,9 +1556,84 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setVideos(prev => prev.filter(v => v.id !== id));
   };
 
+  const moveVideo = async (videoId: string, direction: 'up' | 'down') => {
+    setVideos(prev => {
+      const target = prev.find(v => v.id === videoId);
+      if (!target) return prev;
+      const siblings = prev
+        .filter(v => v.subjectId === target.subjectId)
+        .sort((a, b) => {
+          if (Boolean(b.isPinned) !== Boolean(a.isPinned)) {
+            return b.isPinned ? 1 : -1;
+          }
+          return (a.orderIndex ?? 9999) - (b.orderIndex ?? 9999);
+        });
+      const idx = siblings.findIndex(v => v.id === videoId);
+      if (idx === -1) return prev;
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= siblings.length) return prev;
+
+      const reordered = [...siblings];
+      const [moved] = reordered.splice(idx, 1);
+      reordered.splice(swapIdx, 0, moved);
+
+      const orderMap = new Map<string, number>();
+      reordered.forEach((item, i) => orderMap.set(item.id, i + 1));
+
+      return prev.map(v =>
+        orderMap.has(v.id) ? { ...v, orderIndex: orderMap.get(v.id)! } : v
+      );
+    });
+  };
+
+  const togglePinVideo = async (videoId: string) => {
+    setVideos(prev =>
+      prev.map(v => (v.id === videoId ? { ...v, isPinned: !v.isPinned } : v))
+    );
+  };
+
+  const purgeAllDemoData = async () => {
+    setSubjects(INITIAL_SUBJECTS);
+    setQuestions([]);
+    setLibraryFolders(INITIAL_LIBRARY_FOLDERS);
+    setLibraryFiles([]);
+    setMarketplaceItems([]);
+    setAnnouncements([]);
+    setVideoFolders([]);
+    setVideos([]);
+    setDiscussions([]);
+    setDirectMessages([]);
+    setCommunityMessages([]);
+    setGrades([]);
+    setLeaderboard([]);
+    setGradeAppeals([]);
+    setQuestionComments([]);
+    setQuestionReports([]);
+    setSavedQuestionIds([]);
+    setWrongQuestionIds([]);
+    setSolvedQuestions({});
+    setChapterLastIndex({});
+    setStudentCustomQuizzes([]);
+    setCustomNotifications([]);
+    setReadNotificationIds([]);
+    try {
+      (['admin', 'student', 'guest'] as AccountType[]).forEach((acct) => {
+        localStorage.removeItem(getAccountScopedKey(acct, 'saved_qids'));
+        localStorage.removeItem(getAccountScopedKey(acct, 'q_notes'));
+        localStorage.removeItem(getAccountScopedKey(acct, 'wrong_qids'));
+        localStorage.removeItem(getAccountScopedKey(acct, 'solved_qs'));
+        localStorage.removeItem(getAccountScopedKey(acct, 'chapter_last_idx'));
+        localStorage.removeItem(getAccountScopedKey(acct, 'custom_quizzes'));
+        localStorage.removeItem(getAccountScopedKey(acct, 'read_notifs'));
+      });
+    } catch {
+      // ignore
+    }
+  };
+
   // Discussions
   const addDiscussionPost = async (post: { title: string; content: string; academicYear: string }) => {
-    if (!user) {
+    if (!user || isGuest) {
       setIsAuthModalOpen(true);
       return;
     }
@@ -1015,7 +1641,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `disc-${Date.now()}`,
       authorId: user.uid,
       authorName: user.displayName,
-      authorRole: user.role,
+      authorRole: user.role === 'admin' ? 'admin' : 'student',
       academicYear: post.academicYear,
       title: post.title.trim(),
       content: post.content.trim(),
@@ -1027,7 +1653,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addDiscussionComment = async (postId: string, content: string) => {
-    if (!user) {
+    if (!user || isGuest) {
       setIsAuthModalOpen(true);
       return;
     }
@@ -1035,7 +1661,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `c-${Date.now()}`,
       authorId: user.uid,
       authorName: user.displayName,
-      authorRole: user.role,
+      authorRole: user.role === 'admin' ? 'admin' : 'student',
       content: content.trim(),
       createdAt: 'الآن'
     };
@@ -1461,6 +2087,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
+  const saveStudentCustomQuiz = (quiz: StudentCustomQuiz) => {
+    setStudentCustomQuizzes(prev => {
+      const exists = prev.some(q => q.id === quiz.id);
+      if (exists) {
+        return prev.map(q => (q.id === quiz.id ? quiz : q));
+      }
+      return [quiz, ...prev];
+    });
+  };
+
+  const deleteStudentCustomQuiz = (quizId: string) => {
+    setStudentCustomQuizzes(prev => prev.filter(q => q.id !== quizId));
+  };
+
   const resetQuestionStatus = (questionId: string) => {
     setSolvedQuestions(prev => {
       const copy = { ...prev };
@@ -1489,6 +2129,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setChapterLastIndex({});
   };
 
+  const exportStudyBackup = (): StudyBackupPayload => {
+    return createStudyBackupPayload({
+      accountType,
+      solvedQuestions,
+      savedQuestionIds,
+      wrongQuestionIds,
+      questionNotes,
+      studentCustomQuizzes,
+    });
+  };
+
+  const importStudyBackup = (rawJson: string): { valid: boolean; error?: string } => {
+    const parsed = parseAndValidateStudyBackup(rawJson);
+    if (!parsed.valid || !parsed.payload) {
+      return { valid: false, error: parsed.error };
+    }
+    const { payload } = parsed;
+    setSolvedQuestions(payload.solvedQuestions);
+    setSavedQuestionIds(payload.savedQuestionIds);
+    setWrongQuestionIds(payload.wrongQuestionIds);
+    setQuestionNotes(payload.questionNotes);
+    setStudentCustomQuizzes(payload.studentCustomQuizzes);
+    return { valid: true };
+  };
+
   // MedFur Question Discussions & Reports Actions
   const addQuestionComment = async (questionId: string, content: string) => {
     if (!content.trim()) return;
@@ -1514,6 +2179,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     try {
       await setDoc(doc(db, 'question_comments', newComment.id), sanitizeForFirestore(newComment));
+    } catch {
+      // safe local fallback
+    }
+  };
+
+  const updateQuestionComment = async (commentId: string, newContent: string) => {
+    const trimmed = newContent.trim();
+    if (!trimmed) return;
+    setQuestionComments(prev =>
+      prev.map(c => (c.id === commentId ? applyCommentUpdate(c, trimmed) : c))
+    );
+    try {
+      await updateDoc(doc(db, 'question_comments', commentId), {
+        content: trimmed,
+        updatedAt: 'معدّل الآن',
+        isEdited: true,
+      });
     } catch {
       // safe local fallback
     }
@@ -1640,11 +2322,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         user,
         isAdmin,
+        isGuest,
+        accountType,
+        canToggleRole,
         isAuthModalOpen,
         setIsAuthModalOpen,
         darkMode,
         setDarkMode,
         toggleDarkMode,
+        darkModeSchedule,
+        setDarkModeSchedule,
+        colorTheme,
+        setColorTheme,
         activeSection,
         setActiveSection,
         activeYear,
@@ -1659,6 +2348,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleEyeComfortMode,
         questionFontScale,
         setQuestionFontScale,
+        uiDensity,
+        setUiDensity,
+        quizPreferences,
+        updateQuizPreferences,
+        exportStudyBackup,
+        importStudyBackup,
+        notifications,
+        readNotificationIds,
+        unreadNotificationsCount,
+        activeToastNotification,
+        dismissToastNotification,
+        markNotificationAsRead,
+        markAllNotificationsAsRead,
         subjects,
         questions,
         libraryFolders,
@@ -1668,6 +2370,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         discussions,
         directMessages,
         quickSwitchPersona,
+        switchAccount,
         loginWithGoogle,
         loginWithEmail,
         signOut,
@@ -1683,11 +2386,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateQuestion,
         deleteQuestion,
         addLibraryFolder,
+        updateLibraryFolder,
         renameLibraryFolder,
         deleteLibraryFolder,
+        moveLibraryFolder,
         addLibraryFile,
         updateLibraryFile,
         deleteLibraryFile,
+        moveLibraryFile,
+        togglePinLibraryFile,
         addMarketplaceItem,
         updateMarketplaceItem,
         updateMarketplaceItemStatus,
@@ -1701,6 +2408,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addVideo,
         updateVideo,
         deleteVideo,
+        moveVideo,
+        togglePinVideo,
+        purgeAllDemoData,
         addAnnouncement,
         updateAnnouncement,
         deleteAnnouncement,
@@ -1755,8 +2465,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         resetAllQuestionStatus,
         chapterLastIndex,
         setChapterQuestionIndex,
+        studentCustomQuizzes,
+        saveStudentCustomQuiz,
+        deleteStudentCustomQuiz,
         questionComments,
         addQuestionComment,
+        updateQuestionComment,
         deleteQuestionComment,
         toggleLikeQuestionComment,
         questionReports,

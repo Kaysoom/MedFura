@@ -50,7 +50,7 @@ export const ReportQuestionModal: React.FC<ReportQuestionModalProps> = ({
   question,
   subjectName,
 }) => {
-  const { submitQuestionReport, questionReports } = useApp();
+  const { submitQuestionReport, questionReports, isGuest, setIsAuthModalOpen } = useApp();
 
   const [issueType, setIssueType] = useState<QuestionReportIssueType>('wrong_key');
   const [description, setDescription] = useState('');
@@ -72,6 +72,11 @@ export const ReportQuestionModal: React.FC<ReportQuestionModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isGuest) {
+      onClose();
+      setIsAuthModalOpen(true);
+      return;
+    }
     const fallbackDesc =
       ISSUE_OPTIONS.find((o) => o.id === issueType)?.label || 'مراجعة علمية للسؤال';
     await submitQuestionReport({
@@ -84,12 +89,12 @@ export const ReportQuestionModal: React.FC<ReportQuestionModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150"
       role="dialog"
       aria-modal="true"
       aria-label="إبلاغ عن خطأ علمي أو مطبعي في السؤال"
     >
-      <div className="bg-[#111A2E] border border-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden text-right">
+      <div className="bg-[#111A2E] border border-slate-800 rounded-t-3xl sm:rounded-3xl w-full max-w-lg max-h-[90dvh] overflow-y-auto shadow-2xl text-right">
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-[#0E1628]">
           <button

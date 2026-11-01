@@ -87,22 +87,13 @@ export const AnnouncementsView: React.FC = () => {
   return (
     <div className="w-full max-w-md mx-auto sm:max-w-3xl lg:max-w-4xl px-3.5 py-3.5 space-y-4 text-right overflow-x-hidden">
       
-      {/* Compact Sub-page Top Navigation Row */}
+      {/* Compact Sub-page Top Navigation Row (Click MedFur in top header to return Home) */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800 gap-2">
-        <button
-          type="button"
-          onClick={() => setActiveSection('home')}
-          className="px-2.5 py-1.5 rounded-xl bg-[#131D2E] border border-slate-800 text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer flex items-center gap-1 text-xs font-bold shrink-0"
-        >
-          <ChevronRight className="w-4 h-4" />
-          <span>الرئيسية</span>
-        </button>
-
         <h1 className="text-sm sm:text-lg font-black text-emerald-400 truncate">
           {activeSection === 'about' ? 'من نحن ودليل الكلية' : 'دليل الكلية والإعلانات'}
         </h1>
 
-        {isAdmin ? (
+        {isAdmin && (
           <button
             type="button"
             onClick={() => {
@@ -116,8 +107,6 @@ export const AnnouncementsView: React.FC = () => {
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>إعلان جديد</span>
           </button>
-        ) : (
-          <div className="w-14" />
         )}
       </div>
 
@@ -251,8 +240,8 @@ export const AnnouncementsView: React.FC = () => {
 
       {/* Add Announcement Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3.5 bg-slate-950/75 backdrop-blur-sm animate-in fade-in">
-          <div className="relative w-full max-w-md bg-[#0E172A] rounded-3xl shadow-2xl border border-slate-800 overflow-hidden text-white">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in">
+          <div className="relative w-full sm:max-w-md bg-[#0E172A] rounded-t-3xl sm:rounded-3xl shadow-2xl border-t sm:border border-slate-800 overflow-hidden text-white max-h-[92dvh] overflow-y-auto">
             <div className="bg-sky-600 p-4 text-white flex items-center justify-between">
               <h3 className="font-bold text-sm">
                 {editingAnnouncementId ? 'تعديل الإعلان الرسمي' : 'نشر إعلان رسمي جديد'}

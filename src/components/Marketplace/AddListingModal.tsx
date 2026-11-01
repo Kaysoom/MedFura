@@ -114,27 +114,27 @@ export const AddListingModal: React.FC<AddListingModalProps> = ({ isOpen, onClos
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm overflow-y-auto animate-in fade-in">
-      <div className="relative w-full max-w-lg bg-[#0E172A] rounded-3xl shadow-2xl border border-slate-800 overflow-hidden my-6 text-white">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in">
+      <div className="relative w-full max-w-lg max-h-[92dvh] overflow-y-auto bg-[#0E172A] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-800 text-white">
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-amber-600 to-amber-700 p-5 text-slate-950 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-black/15 backdrop-blur-md flex items-center justify-center">
-              <ShoppingBag className="w-6 h-6 text-slate-950" />
+        <div className="sticky top-0 z-10 bg-gradient-to-r from-amber-600 to-amber-700 p-4 sm:p-5 text-slate-950 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-black/15 backdrop-blur-md flex items-center justify-center shrink-0">
+              <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6 text-slate-950" />
             </div>
             <div>
-              <h3 className="font-black text-lg text-slate-950">
+              <h3 className="font-black text-sm sm:text-lg text-slate-950">
                 إضافة إعلان في سوق المستلزمات
               </h3>
-              <p className="text-xs text-slate-900 font-semibold">
+              <p className="text-[11px] sm:text-xs text-slate-900 font-semibold">
                 بيع، إيجار، أو إعارة الكتب والنوط والمعدات لزملائك
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full bg-black/10 hover:bg-black/20 text-slate-950 transition-colors cursor-pointer"
+            className="p-1.5 rounded-full bg-black/10 hover:bg-black/20 text-slate-950 transition-colors cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>

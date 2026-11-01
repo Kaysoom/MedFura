@@ -84,5 +84,15 @@ service cloud.firestore {
     match /user_question_progress/{progressId} {
       allow read, write: if isSignedIn() && request.resource.data.userId == request.auth.uid;
     }
+
+    // User notification read state (synced with Firebase)
+    match /user_notifications/{userId} {
+      allow read: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow create, update: if isSignedIn() && isOwner(userId)
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.readNotificationIds is list
+        && request.resource.data.readNotificationIds.size() <= 500;
+      allow delete: if isSignedIn() && isOwner(userId);
+    }
   }
 }
