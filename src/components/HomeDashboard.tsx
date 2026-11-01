@@ -115,12 +115,9 @@ export const HomeDashboard: React.FC = () => {
     <div className={`w-full max-w-md mx-auto sm:max-w-3xl lg:max-w-5xl ${density.pageContainerPadding} ${density.sectionGap}`}>
       
       {/* Greeting row */}
-      <div className="text-right space-y-0.5 sm:space-y-1">
-        <p className="text-[11px] sm:text-sm text-slate-400 font-bold">
-          أهلاً بك في منصة مدفور (MedFur) — كلية الطب البشري · جامعة الفرات
-        </p>
-        <h1 className="text-xl sm:text-3xl font-black text-emerald-400 tracking-tight truncate">
-          {user?.displayName || 'زائر (وضع الضيف)'}
+      <div className="text-right">
+        <h1 className="text-xl sm:text-2xl font-black text-emerald-400 tracking-tight truncate">
+          {user?.displayName || 'طالب طب بشري'}
         </h1>
       </div>
 
@@ -165,14 +162,11 @@ export const HomeDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Title: الخدمات الأكاديمية */}
-      <div className="pt-0.5 flex items-center justify-between">
+      {/* Title: الأقسام */}
+      <div className="pt-0.5 flex items-center justify-end">
         <h2 className={`text-sm sm:text-lg font-black ${eyeComfortMode ? 'text-[#F3EDE2]' : 'text-slate-900 dark:text-white'} text-right`}>
-          الخدمات الأكاديمية
+          الأقسام الرئيسية
         </h2>
-        <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-semibold">
-          اختر القسم للمتابعة
-        </span>
       </div>
 
       {/* Responsive Grid: Adapts to UI Density (More items per row & tighter spacing in compact mode) */}
@@ -195,14 +189,11 @@ export const HomeDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Bottom: Title & Subtitle */}
-              <div className="mt-3 sm:mt-4 space-y-0.5 sm:space-y-1">
+              {/* Bottom: Title & Count */}
+              <div className="mt-3 sm:mt-4 space-y-0.5">
                 <h3 className={`font-black text-xs sm:text-base text-white group-hover:${card.color} transition-colors line-clamp-1`}>
                   {card.title}
                 </h3>
-                <p className="text-[10px] sm:text-xs text-slate-400 line-clamp-1">
-                  {card.subtitle}
-                </p>
                 <div className="pt-0.5">
                   <span className="inline-block text-[10px] font-bold text-slate-400 tabular-nums">
                     {card.count}

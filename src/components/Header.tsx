@@ -38,7 +38,7 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react';
-import { usePWAInstall, MedFurMonogramBadge } from './Common/PWAInstallPrompt';
+import { usePWAInstall } from './Common/PWAInstallPrompt';
 import { clearAllOfflineMedia } from '../utils/fileHelpers';
 
 export const COLOR_THEMES: {
@@ -311,10 +311,9 @@ export const Header: React.FC = () => {
                   setSelectedChapterId(null);
                 }}
                 aria-label="MedFur الصفحة الأساسية"
-                className="flex items-center gap-2 cursor-pointer group min-w-0 px-1.5 py-1 rounded-xl hover:bg-white/5 transition-colors"
-                title="MedFur - اضغط للعودة إلى الصفحة الرئيسية"
+                className="flex items-center gap-1 cursor-pointer group min-w-0 px-1.5 py-1 rounded-lg hover:bg-white/5 transition-colors"
+                title="MedFur"
               >
-                <MedFurMonogramBadge className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl shadow-md group-hover:scale-105 transition-transform" />
                 <span className="font-black text-base sm:text-lg tracking-tight bg-clip-text text-transparent medfur-brand-gradient bg-gradient-to-l from-emerald-400 to-sky-400">
                   MedFur
                 </span>
@@ -848,40 +847,28 @@ export const Header: React.FC = () => {
                   <X className="w-4 h-4" />
                 </button>
 
-                <div className="flex items-center gap-2.5 text-right">
-                  <div>
-                    <div className="flex items-center justify-end gap-2">
-                      <span className="font-black text-xs text-emerald-400 tracking-tight">MedFur</span>
-                      <h3 className="font-bold text-sm text-white">
-                        {user?.displayName || 'طالب طب بشري'}
-                      </h3>
-                    </div>
-                    <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30 mt-1">
-                      {user?.batch || 'كلية الطب البشري'} · جامعة الفرات
-                    </span>
+                <div className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <span className="font-black text-xs text-emerald-400 tracking-tight">MedFur</span>
+                    <h3 className="font-bold text-sm text-white">
+                      {user?.displayName || 'طالب طب بشري'}
+                    </h3>
                   </div>
-                  <MedFurMonogramBadge className="w-10 h-10 rounded-xl shadow-md" />
                 </div>
               </div>
 
-              {/* Single Clean Button to Open Full-Page Settings (Density, Modes, Colors, Accounts & Backup) */}
               <button
                 type="button"
                 onClick={() => {
                   handleSelectNav('settings');
                 }}
-                className="w-full p-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 flex items-center justify-between text-right transition-all cursor-pointer group"
+                className="w-full p-3 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 flex items-center justify-end gap-2.5 text-right transition-all cursor-pointer group"
               >
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                  الكثافة · الأوضاع · الحساب
+                <span className="font-black text-xs text-white group-hover:text-emerald-400 transition-colors">
+                  صفحة الإعدادات
                 </span>
-                <div className="flex items-center gap-2.5">
-                  <span className="font-black text-xs text-white group-hover:text-emerald-400 transition-colors">
-                    صفحة الإعدادات
-                  </span>
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
-                    <Settings className="w-4 h-4" />
-                  </div>
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center">
+                  <Settings className="w-4 h-4" />
                 </div>
               </button>
 

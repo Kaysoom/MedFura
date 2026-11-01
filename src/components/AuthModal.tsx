@@ -15,7 +15,6 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { InAppSelect } from './Common/InAppSelect';
-import { MedFurMonogramBadge } from './Common/PWAInstallPrompt';
 
 export const AuthModal: React.FC = () => {
   const { 
@@ -90,14 +89,9 @@ export const AuthModal: React.FC = () => {
             <X className="w-5 h-5" />
           </button>
 
-          <MedFurMonogramBadge className="w-12 h-12 mx-auto mb-2 rounded-2xl shadow-lg" />
-
           <h2 className="text-base sm:text-lg font-black">
-            بوابة الحسابات والدخول — MedFur
+            تسجيل الدخول — MedFur
           </h2>
-          <p className="text-[11px] text-emerald-100/90 mt-0.5">
-            اختر حساباً مؤقتاً للاختبار الفوري أو سجل دخولك بحسابك الجامعي
-          </p>
         </div>
 
         {/* Content body */}

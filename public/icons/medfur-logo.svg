@@ -1,33 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <defs>
-    <radialGradient id="bgGrad" cx="50%" cy="45%" r="65%">
-      <stop offset="0%" stop-color="#073B2E" />
-      <stop offset="100%" stop-color="#031F18" />
-    </radialGradient>
-    <linearGradient id="capEmerald" x1="90" y1="60" x2="430" y2="450" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#00B876" />
-      <stop offset="100%" stop-color="#009E60" />
-    </linearGradient>
-  </defs>
+  <!-- Clean Flat Dark Emerald Background (No 3D shadows or outer margins) -->
+  <rect width="512" height="512" rx="96" fill="#052E24" />
 
-  <!-- Rounded Squircle Dark Emerald Background -->
-  <rect width="512" height="512" rx="116" fill="url(#bgGrad)" />
-
-  <!-- Isometric Graduation Cap formed by M & F Monogram (Top Diamond + Tassel) -->
-  <!-- Outer M & F Cap Top + Right Tassel Drop -->
+  <!-- Pure MF Graduation Cap Symbol (Top Isometric M & F Diamond + Right Tassel) -->
   <path
     d="M250 48 L26 205 L60 231 L250 97 L283 121 L151 215 L235 276 L354 191 L378 209 L235 312 L106 218 L73 242 L250 371 L433 240 L433 380 L477 380 L477 205 L250 48 Z"
-    fill="url(#capEmerald)"
+    fill="#00B371"
   />
-  <!-- Inner M & F Crossbar Detail -->
+  <!-- Inner F Crossbar -->
   <path
     d="M316 145 L197 230 L228 253 L347 168 L316 145 Z"
-    fill="url(#capEmerald)"
+    fill="#00B371"
   />
 
-  <!-- Graduation Cap Skull Base Underneath -->
+  <!-- Graduation Cap Base Underneath -->
   <path
     d="M82 293 L82 387 L237 475 L391 387 L391 312 L237 401 L82 293 Z"
-    fill="url(#capEmerald)"
+    fill="#00B371"
   />
 </svg>

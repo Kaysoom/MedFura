@@ -1048,13 +1048,6 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
           {q.questionText}
         </h3>
 
-        {/* Hint for Dual Verification */}
-        {!solvedState && (
-          <p className="text-[11px] text-slate-400">
-            اضغط مرة لتحديد الخيار بالأزرق، واضغط عليه مرة ثانية أو اضغط رمز (✓) للتحقق، أو استخدم أيقونة العين لشطب الخيارات المستبعدة.
-          </p>
-        )}
-
         {/* Options List (Supports Dynamic 4 to 8 Options) */}
         <div className="space-y-2.5">
           {getQuestionOptions(q).map((choice) => {
@@ -1334,7 +1327,7 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
               {streamTitle}
             </h2>
             <span className="text-[10px] sm:text-[11px] text-slate-400 block truncate">
-              {activeSubject.name} · اضغط الدائرة للإحصائيات
+              {activeSubject.name}
             </span>
           </div>
 
