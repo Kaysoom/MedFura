@@ -84,42 +84,22 @@ export function usePWAInstall() {
   };
 }
 
-export const MedFurMonogramBadge: React.FC<{ className?: string }> = ({
-  className = 'w-9 h-9',
-}) => (
+export const MEDFUR_CAP_LOGO_SRC =
+  './assets/aistudio/______________1_Nov_2026__4.31_pm_b75ae71b.png';
+
+export const MedFurMonogramBadge: React.FC<{
+  className?: string;
+  alt?: string;
+}> = ({ className = 'w-9 h-9', alt = 'شعار MedFur - قبعة التخرج MF' }) => (
   <div
-    className={`relative rounded-xl bg-[#0B132B] border border-emerald-500/40 flex items-center justify-center overflow-hidden shadow-md shrink-0 ${className}`}
+    className={`relative rounded-xl bg-[#04281E] border border-emerald-500/40 flex items-center justify-center overflow-hidden shadow-md shrink-0 ${className}`}
   >
-    <svg viewBox="0 0 64 64" fill="none" className="w-full h-full p-1">
-      <defs>
-        <linearGradient id="mfHdrEmerald" x1="8" y1="12" x2="40" y2="52" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#34D399" />
-          <stop offset="100%" stopColor="#059669" />
-        </linearGradient>
-        <linearGradient id="mfHdrSky" x1="30" y1="12" x2="56" y2="52" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#38BDF8" />
-          <stop offset="100%" stopColor="#0284C7" />
-        </linearGradient>
-      </defs>
-      {/* Interconnected Geometric M & F */}
-      <path
-        d="M11 49L16 16H23L29 33L35 16H42L37 49H31L34 27L28.5 41H24.5L19 27L17 49H11Z"
-        fill="url(#mfHdrEmerald)"
-      />
-      <path
-        d="M35 16H53L51.5 22H40.5L39 30H49.5L48 36H38L36 49H31L35 16Z"
-        fill="url(#mfHdrSky)"
-      />
-      {/* Subtle ECG Pulse */}
-      <path
-        d="M9 40H22L25 34L29 44L33 36L36 40H55"
-        stroke="#34D399"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeOpacity="0.85"
-      />
-    </svg>
+    <img
+      src={MEDFUR_CAP_LOGO_SRC}
+      alt={alt}
+      className="w-full h-full object-cover select-none"
+      loading="eager"
+    />
   </div>
 );
 
@@ -147,7 +127,7 @@ export const PWAInstallInstructionsModal: React.FC<{
             <X className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <div>
               <h3 className="font-black text-sm sm:text-base text-white">
                 تثبيت تطبيق MedFur على جهازك
@@ -156,6 +136,7 @@ export const PWAInstallInstructionsModal: React.FC<{
                 كلية الطب البشري — جامعة الفرات
               </p>
             </div>
+            <MedFurMonogramBadge className="w-10 h-10 rounded-xl" />
           </div>
         </div>
 
@@ -278,13 +259,16 @@ export const PWAInstallPrompt: React.FC = () => {
             </button>
           </div>
 
-          <div className="min-w-0 flex-1 text-right">
-            <h4 className="text-xs font-black text-white truncate">
-              تثبيت تطبيق <span className="text-emerald-400">MedFur</span> على هاتفك
-            </h4>
-            <p className="text-[10px] text-slate-300 truncate">
-              تصفح أسرع للأتمتة والمحاضرات بشاشة كاملة
-            </p>
+          <div className="flex items-center gap-2.5 min-w-0 flex-1 justify-end">
+            <div className="min-w-0 flex-1 text-right">
+              <h4 className="text-xs font-black text-white truncate">
+                تثبيت تطبيق <span className="text-emerald-400">MedFur</span> على هاتفك
+              </h4>
+              <p className="text-[10px] text-slate-300 truncate">
+                تصفح أسرع للأتمتة والمحاضرات بشاشة كاملة
+              </p>
+            </div>
+            <MedFurMonogramBadge className="w-9 h-9 rounded-xl" />
           </div>
         </div>
       )}

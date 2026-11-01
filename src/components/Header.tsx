@@ -38,7 +38,7 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react';
-import { usePWAInstall } from './Common/PWAInstallPrompt';
+import { usePWAInstall, MedFurMonogramBadge } from './Common/PWAInstallPrompt';
 import { clearAllOfflineMedia } from '../utils/fileHelpers';
 
 export const COLOR_THEMES: {
@@ -311,9 +311,10 @@ export const Header: React.FC = () => {
                   setSelectedChapterId(null);
                 }}
                 aria-label="MedFur الصفحة الأساسية"
-                className="flex items-center gap-1 cursor-pointer group min-w-0 px-1.5 py-1 rounded-lg hover:bg-white/5 transition-colors"
+                className="flex items-center gap-2 cursor-pointer group min-w-0 px-1.5 py-1 rounded-xl hover:bg-white/5 transition-colors"
                 title="MedFur - اضغط للعودة إلى الصفحة الرئيسية"
               >
+                <MedFurMonogramBadge className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl shadow-md group-hover:scale-105 transition-transform" />
                 <span className="font-black text-base sm:text-lg tracking-tight bg-clip-text text-transparent medfur-brand-gradient bg-gradient-to-l from-emerald-400 to-sky-400">
                   MedFur
                 </span>
@@ -847,16 +848,19 @@ export const Header: React.FC = () => {
                   <X className="w-4 h-4" />
                 </button>
 
-                <div className="text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <span className="font-black text-xs text-emerald-400 tracking-tight">MedFur</span>
-                    <h3 className="font-bold text-sm text-white">
-                      {user?.displayName || 'طالب طب بشري'}
-                    </h3>
+                <div className="flex items-center gap-2.5 text-right">
+                  <div>
+                    <div className="flex items-center justify-end gap-2">
+                      <span className="font-black text-xs text-emerald-400 tracking-tight">MedFur</span>
+                      <h3 className="font-bold text-sm text-white">
+                        {user?.displayName || 'طالب طب بشري'}
+                      </h3>
+                    </div>
+                    <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30 mt-1">
+                      {user?.batch || 'كلية الطب البشري'} · جامعة الفرات
+                    </span>
                   </div>
-                  <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30 mt-1">
-                    {user?.batch || 'كلية الطب البشري'} · جامعة الفرات
-                  </span>
+                  <MedFurMonogramBadge className="w-10 h-10 rounded-xl shadow-md" />
                 </div>
               </div>
 
