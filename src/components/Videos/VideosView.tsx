@@ -3,8 +3,6 @@ import { useApp } from '../../context/AppContext';
 import {
   Play,
   Clock,
-  Wifi,
-  Download,
   ArrowRight,
   Upload,
   Search,
@@ -14,20 +12,19 @@ import {
   Trash2,
   User,
   CheckCircle2,
-  GraduationCap,
   Edit3,
   ArrowUp,
   ArrowDown,
   Pin,
-  HardDriveDownload,
+  ChevronLeft,
+  BookOpen,
+  Users,
+  Heart,
 } from 'lucide-react';
 import { VideoItem, AcademicYearId, SemesterType, SubjectItem } from '../../types';
 import { ConfirmationDialog } from '../Common/ConfirmationDialog';
 import { InAppSelect } from '../Common/InAppSelect';
-import {
-  SubjectMedicalIcon,
-  resolveSubjectMedicalIcon,
-} from '../Common/SubjectMedicalIcon';
+import { resolveSubjectMedicalIcon } from '../Common/SubjectMedicalIcon';
 import {
   extractVideoMetadata,
   formatVideoDuration,
@@ -38,6 +35,8 @@ import {
   parseFileSizeToBytes,
   removeOfflineMediaRecord,
   StoredMediaRecord,
+  cancelManagedDownload,
+  launchMediaInExternalPlayer,
 } from '../../utils/fileHelpers';
 import {
   InAppMediaViewerModal,
@@ -49,10 +48,16 @@ import {
 } from '../Common/MediaLaunchChoiceModal';
 import {
   DownloadManager,
-  InlineDownloadStatus,
   useDownloadManager,
 } from '../Common/DownloadManager';
 import { buildStructuredMedFurFileName } from '../../utils/mediaAndOfflineLogic';
+import {
+  MediaIconWithCircularProgress,
+  MediaThreeDotsMenu,
+} from '../Common/MediaCardControls';
+import { groupSubjectVideosIntoSections } from '../../utils/redesignStructureLogic';
+
+const FAVORITE_VIDEOS_STORAGE_KEY = 'medfur_favorite_videos_v1';
 
 function extractYouTubeInfo(
   rawUrl: string
@@ -79,13 +84,12 @@ export const VideosView: React.FC = () => {
     moveVideo,
     togglePinVideo,
     isAdmin,
+    setActiveSection,
   } = useApp();
 
   const {
     activeDownloads,
     cachedIds,
-    cachedRecords,
-    isDownloadingCount,
     refreshState,
   } = useDownloadManager();
 
@@ -93,9 +97,35 @@ export const VideosView: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<AcademicYearId>('year-3');
   const [selectedSemester, setSelectedSemester] = useState<SemesterType>('first');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
 
   // Search filter
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchBar, setShowSearchBar] = useState(false);
+
+  // Favorite video IDs persisted in localStorage
+  const [favoriteVideoIds, setFavoriteVideoIds] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(FAVORITE_VIDEOS_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(FAVORITE_VIDEOS_STORAGE_KEY, JSON.stringify(favoriteVideoIds));
+    } catch {
+      // ignore
+    }
+  }, [favoriteVideoIds]);
+
+  const toggleFavoriteVideo = (vidId: string) => {
+    setFavoriteVideoIds((prev) =>
+      prev.includes(vidId) ? prev.filter((id) => id !== vidId) : [...prev, vidId]
+    );
+  };
 
   // In-App Video Player & Launch Choice Modal State
   const [viewerItem, setViewerItem] = useState<InAppViewerItem | null>(null);
@@ -133,12 +163,11 @@ export const VideosView: React.FC = () => {
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
 
   const academicYearsList = [
-    { id: 'year-3' as AcademicYearId, name: 'السنة الثالثة', badge: '3' },
-    { id: 'year-2' as AcademicYearId, name: 'السنة الثانية', badge: '2' },
-    { id: 'year-prep' as AcademicYearId, name: 'السنة التحضيرية', badge: 'تحضيري' },
-    { id: 'year-4' as AcademicYearId, name: 'السنة الرابعة', badge: '4' },
-    { id: 'year-5' as AcademicYearId, name: 'السنة الخامسة', badge: '5' },
-    { id: 'year-6' as AcademicYearId, name: 'السنة السادسة', badge: '6' },
+    { id: 'year-prep' as AcademicYearId, name: 'السنة التحضيرية', shortLabel: 'تحضيرية' },
+    { id: 'year-2' as AcademicYearId, name: 'السنة الثانية', shortLabel: 'الثانية' },
+    { id: 'year-3' as AcademicYearId, name: 'السنة الثالثة', shortLabel: 'الثالثة' },
+    { id: 'year-4' as AcademicYearId, name: 'السنة الرابعة', shortLabel: 'الرابعة' },
+    { id: 'year-5' as AcademicYearId, name: 'السنة الخامسة', shortLabel: 'الخامسة' },
   ];
 
   // Subjects belonging to current year and semester
@@ -167,9 +196,19 @@ export const VideosView: React.FC = () => {
       });
   }, [videos, activeSubject]);
 
-  // Filtered videos when in subject view or search
+  // Doctor/Section groups inside active subject (Page 7)
+  const subjectSections = useMemo(() => {
+    return groupSubjectVideosIntoSections(currentSubjectVideos);
+  }, [currentSubjectVideos]);
+
+  const activeSectionGroup = useMemo(() => {
+    if (!selectedSectionId) return null;
+    return subjectSections.find((s) => s.id === selectedSectionId) || null;
+  }, [subjectSections, selectedSectionId]);
+
+  // Filtered videos when in section view or search
   const displayedVideos = useMemo(() => {
-    let list = currentSubjectVideos;
+    let list = activeSectionGroup ? activeSectionGroup.videos : currentSubjectVideos;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter(
@@ -180,7 +219,7 @@ export const VideosView: React.FC = () => {
       );
     }
     return list;
-  }, [currentSubjectVideos, searchQuery]);
+  }, [activeSectionGroup, currentSubjectVideos, searchQuery]);
 
   // Real dynamic duration calculation for a subject based on actual uploaded videos
   const getSubjectDuration = (sub: SubjectItem) => {
@@ -196,6 +235,21 @@ export const VideosView: React.FC = () => {
   const getSubjectVideoCount = (sub: SubjectItem) => {
     return videos.filter((v) => v.subjectId === sub.id).length;
   };
+
+  // Total stats for current year + semester (Page 6 header pills)
+  const yearSemStats = useMemo(() => {
+    const subIds = new Set(availableSubjects.map((s) => s.id));
+    const matchingVids = videos.filter((v) => subIds.has(v.subjectId));
+    const totalSec = matchingVids.reduce(
+      (acc, v) => acc + parseDurationToSeconds(v.duration, v.durationSeconds),
+      0
+    );
+    return {
+      subjectsCount: availableSubjects.length,
+      videosCount: matchingVids.length,
+      totalDuration: formatTotalHoursDuration(totalSec),
+    };
+  }, [availableSubjects, videos]);
 
   const resolveVideoMedFurMeta = (vid: {
     subjectId?: string;
@@ -233,25 +287,22 @@ export const VideosView: React.FC = () => {
     });
   };
 
-  // Show fast chooser modal (In-App Player vs External Player) when clicking a video
-  const handlePlayVideoInApp = (vid: VideoItem) => {
-    const medfurMeta = resolveVideoMedFurMeta(vid);
-    setLaunchChoiceTarget({
-      id: vid.id,
-      type: 'video',
-      title: vid.title,
-      subtitle: vid.chapterName || vid.academicYear,
-      authorOrDoctor: vid.doctorName,
-      fileName: medfurMeta.fileName,
-      virtualPath: medfurMeta.virtualPath,
-      url: vid.videoUrl,
-      mimeType: vid.mimeType || 'video/mp4',
-      fileSize: vid.fileSize,
-      duration: vid.duration,
-      description: vid.description,
-      isCachedOffline:
-        cachedIds.includes(vid.id) || vid.requiresInternet === false,
-    });
+  // Primary click on video row:
+  // - If downloading -> cancel download
+  // - If already cached offline -> open directly in In-App Player
+  // - Otherwise -> start inline circular download immediately
+  const handlePrimaryVideoClick = (vid: VideoItem) => {
+    const progress = activeDownloads[vid.id];
+    if (progress?.status === 'downloading') {
+      cancelManagedDownload(vid.id);
+      return;
+    }
+    const isOffline = cachedIds.includes(vid.id) || vid.requiresInternet === false;
+    if (isOffline) {
+      openVideoDirectlyInApp(vid);
+    } else {
+      handleDownloadVideo(null, vid, false);
+    }
   };
 
   const handleOpenFromDownloadManager = (record: StoredMediaRecord) => {
@@ -270,10 +321,11 @@ export const VideosView: React.FC = () => {
     });
   };
 
-  // Real Streaming Download for Video with Progress Bar, IndexedDB Caching & External Device Save with MedFur Filename
+  // Real Streaming Download for Video with Circular Progress & IndexedDB Caching
   const handleDownloadVideo = async (
     e: React.MouseEvent | null,
-    vid: VideoItem
+    vid: VideoItem,
+    saveToDevice = false
   ) => {
     e?.stopPropagation();
     try {
@@ -296,21 +348,45 @@ export const VideosView: React.FC = () => {
         itemType: 'video',
         duration: vid.duration,
         virtualPath: medfurMeta.virtualPath,
-        saveToDevice: true,
+        saveToDevice,
       });
 
       refreshState();
       await updateVideo(vid.id, { requiresInternet: false });
 
-      setDownloadNotice(
-        `تم حفظ الفيديو داخل التطبيق وتنزيله لجهازك بالاسم المنظم: ${medfurMeta.fileName}`
-      );
-      setTimeout(() => {
-        setDownloadNotice(null);
-      }, 4500);
+      if (saveToDevice) {
+        setDownloadNotice(`تم حفظ الفيديو وتنزيله للجهاز: ${medfurMeta.fileName}`);
+        setTimeout(() => setDownloadNotice(null), 3500);
+      }
     } catch {
-      // handled by InlineDownloadStatus
+      // handled inline
     }
+  };
+
+  const handleShareVideo = async (vid: VideoItem) => {
+    const shareText = `🎬 ${vid.title} — ${vid.doctorName} (MedFur)`;
+    const shareUrl = vid.videoUrl || window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: vid.title, text: shareText, url: shareUrl });
+        return;
+      } catch {
+        // fallback
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+      setDownloadNotice('تم نسخ رابط الفيديو للمشاركة ✓');
+      setTimeout(() => setDownloadNotice(null), 3000);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleSendVideoTelegram = (vid: VideoItem) => {
+    const text = encodeURIComponent(`🎬 ${vid.title}\nالمحاضر: ${vid.doctorName}\nعبر تطبيق MedFur`);
+    const url = encodeURIComponent(vid.videoUrl || window.location.href);
+    window.open(`https://t.me/share/url?url=${url}&text=${text}`, '_blank');
   };
 
   // Handle device file upload for video with automatic duration, real size & cover capture
@@ -353,7 +429,6 @@ export const VideosView: React.FC = () => {
     }
   };
 
-  // Handle external URL input with automatic YouTube / direct MP4 metadata resolution
   const handleExternalVideoUrlChange = (rawVal: string) => {
     setUploadVideoUrl(rawVal);
     const trimmed = rawVal.trim();
@@ -400,7 +475,6 @@ export const VideosView: React.FC = () => {
     setIsUploadModalOpen(true);
   };
 
-  // Submit Video Upload / Edit
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!uploadTitle.trim()) return;
@@ -530,547 +604,567 @@ export const VideosView: React.FC = () => {
     setIsUploadModalOpen(false);
   };
 
+  const openNewVideoUploadModal = () => {
+    setEditingVideoId(null);
+    setUploadTitle('');
+    setUploadDoctor(activeSectionGroup?.doctorName || '');
+    setUploadChapterName(activeSectionGroup?.title || '');
+    setUploadVideoUrl('');
+    setUploadThumbnail('');
+    setUploadDuration('يُقرأ تلقائياً من الفيديو');
+    setUploadDurationSeconds(0);
+    setUploadedVideoSize('يُقرأ تلقائياً من الفيديو');
+    setUploadedVideoSizeBytes(0);
+    setSelectedRawVideoFile(null);
+    setUploadedFileName(null);
+    setUploadDescription('');
+    setUploadSubjectId(activeSubject?.id || availableSubjects[0]?.id || '');
+    setIsUploadModalOpen(true);
+  };
+
+  const currentYearName =
+    academicYearsList.find((y) => y.id === selectedYear)?.name || 'السنة الثالثة';
+
   return (
     <div
       dir="rtl"
-      className="w-full max-w-6xl mx-auto px-3 sm:px-6 py-3.5 sm:py-5 space-y-4 text-right selection:bg-rose-500 selection:text-white overflow-x-hidden"
+      className="w-full max-w-4xl mx-auto px-3 sm:px-5 py-3 sm:py-4 space-y-3.5 text-right overflow-x-hidden"
     >
       {/* Toast Notification */}
       {downloadNotice && (
-        <div className="p-3.5 rounded-2xl bg-slate-900 border border-emerald-500/50 text-white shadow-xl flex items-center justify-between gap-2.5 animate-in fade-in duration-300">
+        <div className="p-3.5 rounded-2xl bg-emerald-950/90 border border-emerald-500/40 text-emerald-200 text-xs font-bold flex items-center justify-between gap-2 animate-in fade-in">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span className="text-xs font-bold">{downloadNotice}</span>
+            <span>{downloadNotice}</span>
           </div>
-          <button
-            type="button"
-            onClick={() => setIsDownloadManagerOpen(true)}
-            className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-bold shrink-0 cursor-pointer"
-          >
-            عرض التنزيلات
-          </button>
         </div>
       )}
 
       {/* ======================================================== */}
-      {/* VIEW A: LIST OF SUBJECTS (شاشة القائمة والمواد)             */}
+      {/* LEVEL 1: SUBJECTS GRID (Matching Page 6)                 */}
       {/* ======================================================== */}
       {!selectedSubjectId ? (
-        <div className="space-y-4 animate-in fade-in duration-200">
-          {/* Compact Header Controls Banner */}
-          <div className="bg-gradient-to-r from-rose-700 via-pink-700 to-rose-900 text-white p-4 sm:p-6 rounded-2xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="space-y-1.5">
-              <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-100">
-                <Film className="w-3.5 h-3.5" />
-                <span>المرئيات والشروحات الأكاديمية</span>
+        <div className="space-y-3.5 animate-in fade-in duration-200">
+          {/* 1. Emerald Header Card (Page 6) */}
+          <div className="bg-gradient-to-l from-emerald-500 via-emerald-600 to-teal-700 text-white rounded-3xl p-4 sm:p-5 shadow-lg space-y-3.5 dark-surface-preserve">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('home')}
+                  aria-label="رجوع للرئيسية"
+                  className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors cursor-pointer shrink-0"
+                >
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+
+                <div className="min-w-0">
+                  <h1 className="text-lg sm:text-xl font-black text-white leading-tight truncate">
+                    المرئيات والشروحات
+                  </h1>
+                  <p className="text-xs text-emerald-50/90 font-bold truncate mt-0.5">
+                    كل المحاضرات المصورة بمكان واحد
+                  </p>
+                </div>
               </div>
-              <h1 className="text-base sm:text-2xl font-black leading-snug">
-                بوابة الفيديوهات والمحاضرات المصورة
-              </h1>
-              <p className="text-[11px] sm:text-xs text-rose-100 max-w-xl leading-relaxed">
-                مشغل فيديو حديث متكامل مع دعم التقديم والترجيع، التحكم بالسرعة، والتنزيل المؤقت للتشغيل بدون إنترنت.
-              </p>
-            </div>
 
-            <div className="flex items-center gap-2 flex-wrap shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsDownloadManagerOpen(true)}
-                className="px-3 py-2 rounded-xl bg-black/25 hover:bg-black/40 border border-white/20 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <HardDriveDownload
-                  className={`w-4 h-4 text-emerald-300 ${
-                    isDownloadingCount > 0 ? 'animate-bounce' : ''
-                  }`}
-                />
-                <span>مدير التنزيلات</span>
-                <span className="px-1.5 py-0.5 rounded-md bg-white/15 text-[10px] font-black tabular-nums">
-                  {cachedRecords.length}
-                </span>
-              </button>
-
-              {/* Supervisor Upload CTA */}
               {isAdmin && (
                 <button
-                  onClick={() => {
-                    setEditingVideoId(null);
-                    setUploadTitle('');
-                    setUploadDoctor('');
-                    setUploadChapterName('');
-                    setUploadVideoUrl('');
-                    setUploadThumbnail('');
-                    setUploadDuration('يُقرأ تلقائياً من الفيديو');
-                    setUploadDurationSeconds(0);
-                    setUploadedVideoSize('يُقرأ تلقائياً من الفيديو');
-                    setUploadedVideoSizeBytes(0);
-                    setSelectedRawVideoFile(null);
-                    setUploadedFileName(null);
-                    setUploadDescription('');
-                    setUploadSubjectId(availableSubjects[0]?.id || '');
-                    setIsUploadModalOpen(true);
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-white text-rose-700 hover:bg-rose-50 text-xs font-black transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5 shrink-0"
+                  type="button"
+                  onClick={openNewVideoUploadModal}
+                  title="رفع فيديو جديد"
+                  aria-label="رفع فيديو جديد"
+                  className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center justify-center cursor-pointer transition-colors shrink-0"
                 >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>رفع فيديو جديد</span>
+                  <Upload className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Bottom Stat Pills: X مواد | Y فيديو | HH:MM:SS */}
+            <div className="flex items-center gap-2 flex-wrap pt-0.5">
+              <div className="px-3.5 py-1.5 rounded-full bg-black/20 text-white text-xs font-black flex items-center gap-1.5 tabular-nums">
+                <BookOpen className="w-3.5 h-3.5 text-emerald-200" />
+                <span>{yearSemStats.subjectsCount} مواد</span>
+              </div>
+              <div className="px-3.5 py-1.5 rounded-full bg-black/20 text-white text-xs font-black flex items-center gap-1.5 tabular-nums">
+                <Film className="w-3.5 h-3.5 text-rose-200" />
+                <span>{yearSemStats.videosCount} فيديو</span>
+              </div>
+              <div className="px-3.5 py-1.5 rounded-full bg-black/20 text-white text-xs font-black flex items-center gap-1.5 tabular-nums font-mono">
+                <Clock className="w-3.5 h-3.5 text-amber-200" />
+                <span>{yearSemStats.totalDuration}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Year & Semester Selector Card (Page 6) */}
+          <div className="bg-[#161F30] border border-slate-800/80 rounded-3xl p-2.5 sm:p-3 space-y-2.5 shadow-sm">
+            {/* Row 1: Academic Years */}
+            <div className="grid grid-cols-5 gap-1">
+              {academicYearsList.map((yr) => {
+                const active = selectedYear === yr.id;
+                return (
+                  <button
+                    key={yr.id}
+                    type="button"
+                    onClick={() => setSelectedYear(yr.id)}
+                    className={`py-2 px-1.5 rounded-2xl text-[11px] sm:text-xs font-black transition-all cursor-pointer truncate ${
+                      active
+                        ? 'bg-emerald-500 text-white shadow-md'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                    }`}
+                  >
+                    {yr.shortLabel}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Row 2: Semester Toggle */}
+            <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+              <button
+                type="button"
+                onClick={() => setSelectedSemester('first')}
+                className={`py-2.5 px-3 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                  selectedSemester === 'first'
+                    ? 'bg-emerald-500 text-white shadow-md'
+                    : 'bg-[#0F1726] text-slate-400 hover:text-white'
+                }`}
+              >
+                الفصل الأول
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedSemester('second')}
+                className={`py-2.5 px-3 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
+                  selectedSemester === 'second'
+                    ? 'bg-emerald-500 text-white shadow-md'
+                    : 'bg-[#0F1726] text-slate-400 hover:text-white'
+                }`}
+              >
+                الفصل الثاني
+              </button>
+            </div>
+          </div>
+
+          {/* 3. 2-Column Subject Cards Grid (Matching Page 6) */}
+          {availableSubjects.length === 0 ? (
+            <div className="text-center py-14 bg-[#161F30] rounded-3xl border border-slate-800/80 p-8 space-y-2.5">
+              <Film className="w-10 h-10 text-slate-500 mx-auto" />
+              <h4 className="text-xs sm:text-sm font-black text-slate-300">
+                لا توجد مواد مسجلة لهذا الفصل في السنة المختارة
+              </h4>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {availableSubjects.map((sub) => {
+                const videoCount = getSubjectVideoCount(sub);
+                const duration = getSubjectDuration(sub);
+                const { accentColor } = resolveSubjectMedicalIcon(sub);
+
+                return (
+                  <div
+                    key={sub.id}
+                    onClick={() => {
+                      setSelectedSubjectId(sub.id);
+                      setSelectedSectionId(null);
+                      setSearchQuery('');
+                    }}
+                    className="group bg-[#161F30] hover:bg-[#1B263B] border border-slate-800/80 hover:border-emerald-500/40 rounded-3xl p-4 transition-all cursor-pointer flex flex-col justify-between gap-4 text-right min-w-0 shadow-xs"
+                  >
+                    {/* Top Row: Play Circle Icon on Right + Video Count Pill on Left */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div
+                        className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
+                        style={{
+                          backgroundColor: `${accentColor}20`,
+                          color: accentColor,
+                        }}
+                      >
+                        <Play className="w-5 h-5 fill-current" />
+                      </div>
+
+                      <span className="px-2.5 py-1 rounded-full bg-[#0F1726] border border-slate-800 text-[11px] font-black text-slate-300 tabular-nums">
+                        {videoCount} فيديو
+                      </span>
+                    </div>
+
+                    {/* Bottom Row: Subject Name + Duration */}
+                    <div className="space-y-1 min-w-0">
+                      <h4 className="font-black text-sm sm:text-base text-white group-hover:text-emerald-400 transition-colors leading-snug line-clamp-1">
+                        {sub.name}
+                      </h4>
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 font-mono tabular-nums">
+                        <Clock className="w-3 h-3 text-slate-500 shrink-0" />
+                        <span>{duration}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : !selectedSectionId && searchQuery.trim() === '' ? (
+        /* ======================================================== */
+        /* LEVEL 2: SUBJECT SECTIONS / DOCTORS VIEW (Matching Page 7) */
+        /* ======================================================== */
+        <div className="space-y-3.5 animate-in fade-in duration-200">
+          {/* Emerald Header Card for Active Subject (Page 7) */}
+          <div className="bg-gradient-to-l from-emerald-500 via-emerald-600 to-teal-700 text-white rounded-3xl p-4 sm:p-5 shadow-lg space-y-3.5 dark-surface-preserve">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedSubjectId(null);
+                    setSelectedSectionId(null);
+                  }}
+                  aria-label="رجوع للمواد"
+                  className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors cursor-pointer shrink-0"
+                >
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+
+                <div className="min-w-0">
+                  <h1 className="text-lg sm:text-xl font-black text-white leading-tight truncate">
+                    {activeSubject?.name}
+                  </h1>
+                  <p className="text-xs text-emerald-50/90 font-bold truncate mt-0.5">
+                    {currentYearName} •{' '}
+                    {selectedSemester === 'first' ? 'الفصل الأول' : 'الفصل الثاني'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={openNewVideoUploadModal}
+                    className="px-3 py-2 rounded-2xl bg-white text-emerald-700 hover:bg-emerald-50 text-xs font-black flex items-center gap-1 cursor-pointer shadow-xs"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span className="hidden sm:inline">رفع فيديو</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowSearchBar((prev) => !prev)}
+                  aria-label="بحث في فيديوهات المادة"
+                  className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white cursor-pointer"
+                >
+                  <Search className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {showSearchBar && (
+              <div className="relative animate-in fade-in duration-150">
+                <Search className="w-4 h-4 text-white/70 absolute right-3.5 top-3 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="ابحث عن محاضرة أو دكتور..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pr-10 pl-9 py-2.5 rounded-2xl bg-black/25 border border-white/20 text-xs sm:text-sm font-bold text-white placeholder:text-white/70 focus:outline-hidden focus:border-white"
+                />
+              </div>
+            )}
+
+            {/* Bottom Stat Pills: X أقسام | Y فيديو */}
+            <div className="flex items-center gap-2 flex-wrap pt-0.5">
+              <div className="px-3.5 py-1.5 rounded-full bg-black/20 text-white text-xs font-black flex items-center gap-1.5 tabular-nums">
+                <Users className="w-3.5 h-3.5 text-emerald-200" />
+                <span>{subjectSections.length} أقسام</span>
+              </div>
+              <div className="px-3.5 py-1.5 rounded-full bg-black/20 text-white text-xs font-black flex items-center gap-1.5 tabular-nums">
+                <Film className="w-3.5 h-3.5 text-rose-200" />
+                <span>{currentSubjectVideos.length} فيديو</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Doctor / Section Cards List (Matching Page 7) */}
+          {subjectSections.length === 0 ? (
+            <div className="text-center py-14 bg-[#161F30] rounded-3xl border border-slate-800/80 p-8 space-y-2.5">
+              <Film className="w-10 h-10 text-slate-500 mx-auto" />
+              <h4 className="text-xs sm:text-sm font-black text-slate-300">
+                لا توجد فيديوهات مرفوعة في هذا المقرر حالياً
+              </h4>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={openNewVideoUploadModal}
+                  className="mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  رفع أول فيديو للمادة
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {subjectSections.map((sec) => (
+                <div
+                  key={sec.id}
+                  onClick={() => setSelectedSectionId(sec.id)}
+                  className="group bg-[#161F30] hover:bg-[#1B263B] border border-slate-800/80 hover:border-emerald-500/40 rounded-3xl p-4 sm:p-5 flex items-center justify-between gap-3.5 cursor-pointer transition-all shadow-xs"
+                >
+                  <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                    {/* Right: Colored Play Circle Icon */}
+                    <div
+                      className="w-13 h-13 rounded-2xl flex items-center justify-center shrink-0"
+                      style={{
+                        backgroundColor: `${sec.badgeColor}20`,
+                        color: sec.badgeColor,
+                      }}
+                    >
+                      <Play className="w-6 h-6 fill-current" />
+                    </div>
+
+                    {/* Middle: Title + Badge + Count + CTA */}
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-black text-sm sm:text-base text-white leading-snug break-words">
+                          {sec.title}
+                        </h3>
+                        <span
+                          className="px-2.5 py-0.5 rounded-full text-[10px] font-black"
+                          style={{
+                            backgroundColor: `${sec.badgeColor}25`,
+                            color: sec.badgeColor,
+                          }}
+                        >
+                          القسم {sec.index}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
+                        <Film className="w-3.5 h-3.5 text-slate-500" />
+                        <span>{sec.videos.length} فيديو</span>
+                      </div>
+
+                      <div
+                        className="text-xs font-black flex items-center gap-1"
+                        style={{ color: sec.badgeColor }}
+                      >
+                        <span>استعرض الفيديوهات</span>
+                        <span>←</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-white transition-colors shrink-0" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* ======================================================== */
+        /* LEVEL 3: VIDEOS LIST INSIDE A SECTION / SEARCH           */
+        /* ======================================================== */
+        <div className="space-y-3.5 animate-in fade-in duration-200">
+          {/* Emerald Header Card for Active Section */}
+          <div className="bg-gradient-to-l from-emerald-500 via-emerald-600 to-teal-700 text-white rounded-3xl p-4 sm:p-5 shadow-lg space-y-3.5 dark-surface-preserve">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedSectionId) {
+                      setSelectedSectionId(null);
+                    } else {
+                      setSearchQuery('');
+                    }
+                  }}
+                  aria-label="رجوع للأقسام"
+                  className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors cursor-pointer shrink-0"
+                >
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+
+                <div className="min-w-0">
+                  <h1 className="text-lg sm:text-xl font-black text-white leading-tight truncate">
+                    {activeSectionGroup?.title || activeSubject?.name}
+                  </h1>
+                  <p className="text-xs text-emerald-50/90 font-bold truncate mt-0.5">
+                    {activeSubject?.name} • {displayedVideos.length} فيديو
+                  </p>
+                </div>
+              </div>
+
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={openNewVideoUploadModal}
+                  className="px-3 py-2 rounded-2xl bg-white text-emerald-700 hover:bg-emerald-50 text-xs font-black flex items-center gap-1 cursor-pointer shadow-xs shrink-0"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span>رفع فيديو</span>
+                </button>
+              )}
+            </div>
+
+            {/* Search bar inside Section */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-white/70 absolute right-3.5 top-3 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="ابحث في الفيديوهات..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pr-10 pl-9 py-2.5 rounded-2xl bg-black/25 border border-white/20 text-xs sm:text-sm font-bold text-white placeholder:text-white/70 focus:outline-hidden focus:border-white"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute left-3 top-2.5 text-white/80 hover:text-white cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
                 </button>
               )}
             </div>
           </div>
 
-          {/* Filter Bar: Dropdown for Academic Year & Toggle Buttons for Semesters */}
-          <div className="bg-white dark:bg-slate-900 p-3.5 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-3 sm:space-y-0 sm:flex sm:items-center sm:justify-between gap-3">
-            {/* 1. Academic Year In-App Selector */}
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <span className="text-xs font-black text-slate-500 shrink-0">
-                السنة:
-              </span>
-              <div className="flex-1 sm:w-60">
-                <InAppSelect<AcademicYearId>
-                  value={selectedYear}
-                  onChange={(val) => setSelectedYear(val)}
-                  size="sm"
-                  variant="adaptive"
-                  icon={<GraduationCap className="w-4 h-4" />}
-                  options={academicYearsList.map((yr) => ({
-                    value: yr.id,
-                    label: yr.name,
-                  }))}
-                />
-              </div>
-            </div>
-
-            {/* 2. Semester Toggle Buttons */}
-            <div className="flex items-center justify-between sm:justify-end gap-2">
-              <div className="p-1 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center gap-1">
-                <button
-                  onClick={() => setSelectedSemester('first')}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    selectedSemester === 'first'
-                      ? 'bg-rose-600 text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  الفصل الأول
-                </button>
-                <button
-                  onClick={() => setSelectedSemester('second')}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    selectedSemester === 'second'
-                      ? 'bg-rose-600 text-white shadow-xs'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  الفصل الثاني
-                </button>
-              </div>
-
-              <div className="text-[11px] font-bold text-slate-400 font-mono shrink-0">
-                {availableSubjects.length} مقررات
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Subject Cards Grid (بطاقات المواد) */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-black text-slate-400 px-1">
-              اختر المادة لعرض فيديوهاتها وشروحاتها:
-            </h3>
-
-            {availableSubjects.length === 0 ? (
-              <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 space-y-3">
-                <Film className="w-12 h-12 text-slate-400 mx-auto opacity-40" />
-                <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                  لا توجد مواد مسجلة لهذا الفصل في السنة المختارة
-                </h4>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {availableSubjects.map((sub) => {
-                  const videoCount = getSubjectVideoCount(sub);
-                  const duration = getSubjectDuration(sub);
-                  const { accentColor } = resolveSubjectMedicalIcon(sub);
-
-                  return (
-                    <div
-                      key={sub.id}
-                      onClick={() => {
-                        setSelectedSubjectId(sub.id);
-                        setSearchQuery('');
-                      }}
-                      className="group bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200 dark:border-slate-800 hover:border-rose-500/50 hover:shadow-xl transition-all cursor-pointer flex items-center justify-between gap-3.5 text-right min-w-0"
-                    >
-                      <div className="w-9 h-9 rounded-2xl bg-slate-100 dark:bg-slate-800 group-hover:bg-rose-600 group-hover:text-white text-slate-400 flex items-center justify-center transition-colors shrink-0">
-                        <ArrowRight className="w-4 h-4 rotate-180" />
-                      </div>
-
-                      <div className="flex-1 min-w-0 space-y-1.5">
-                        <h4 className="font-black text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors line-clamp-1">
-                          {sub.name}
-                        </h4>
-
-                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium font-mono flex flex-wrap items-center justify-end gap-1.5">
-                          <span>{videoCount} فيديو</span>
-                          <span>•</span>
-                          <span className="text-rose-600 dark:text-rose-400 font-bold">
-                            {duration}
-                          </span>
-                        </p>
-                      </div>
-
-                      <div
-                        className="subject-medical-badge w-13 h-13 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform border"
-                        style={{
-                          backgroundColor: `${accentColor}18`,
-                          borderColor: `${accentColor}40`,
-                          color: accentColor,
-                        }}
-                      >
-                        <SubjectMedicalIcon
-                          subject={sub}
-                          className="w-6 h-6 sm:w-7 sm:h-7"
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      ) : (
-        /* ======================================================== */
-        /* VIEW B: SINGLE SUBJECT VIDEOS (شاشة عرض الفيديوهات للمادة الواحدة) */
-        /* ======================================================== */
-        <div className="space-y-6 animate-in fade-in duration-200">
-          {/* Back button and path */}
-          <div className="flex flex-wrap items-center justify-between gap-2.5">
-            <button
-              onClick={() => setSelectedSubjectId(null)}
-              className="px-4 py-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-rose-600 hover:border-rose-400 transition-colors flex items-center gap-2 cursor-pointer shadow-xs"
-            >
-              <ArrowRight className="w-4 h-4" />
-              <span>الرجوع إلى قائمة المقررات</span>
-            </button>
-
-            {isAdmin && (
-              <button
-                onClick={() => {
-                  setEditingVideoId(null);
-                  setUploadTitle('');
-                  setUploadDoctor('');
-                  setUploadChapterName('');
-                  setUploadVideoUrl('');
-                  setUploadThumbnail('');
-                  setUploadDuration('يُقرأ تلقائياً من الفيديو');
-                  setUploadDurationSeconds(0);
-                  setUploadedVideoSize('يُقرأ تلقائياً من الفيديو');
-                  setUploadedVideoSizeBytes(0);
-                  setSelectedRawVideoFile(null);
-                  setUploadedFileName(null);
-                  setUploadDescription('');
-                  setUploadSubjectId(activeSubject?.id || '');
-                  setIsUploadModalOpen(true);
-                }}
-                className="px-4 py-2 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-md"
-              >
-                <Upload className="w-4 h-4" />
-                <span>رفع فيديو جديد لهذا المقرر</span>
-              </button>
-            )}
-          </div>
-
-          {/* Top Bar showing Course, Video Count & Real Total Hours */}
-          {activeSubject && (
-            <div className="bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 border border-rose-500/30 p-4 sm:p-5 rounded-2xl text-white shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
-              <div className="space-y-1.5 min-w-0">
-                <span className="text-[11px] text-rose-300 block">
-                  {selectedSemester === 'first' ? 'الفصل الأول' : 'الفصل الثاني'}{' '}
-                  •{' '}
-                  {
-                    academicYearsList.find((y) => y.id === selectedYear)?.name
-                  }
-                </span>
-                <h2 className="text-base sm:text-2xl font-black break-words">
-                  مرئيات مقرر {activeSubject.name}
-                </h2>
-                <p className="text-[11px] sm:text-xs text-slate-300 flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                  <span className="truncate">
-                    {activeSubject.department || 'القسم الأكاديمي'}
-                  </span>
-                </p>
-              </div>
-
-              {/* Dynamic Stats Box */}
-              <div className="flex items-center gap-3 bg-white/5 border border-white/10 p-2.5 px-4 rounded-xl shrink-0 self-start sm:self-auto font-mono text-center">
-                <div className="px-2.5 border-l border-white/10">
-                  <div className="text-base sm:text-xl font-black text-rose-400">
-                    {displayedVideos.length}
-                  </div>
-                  <div className="text-[10px] text-slate-400 font-sans">
-                    فيديو
-                  </div>
-                </div>
-                <div className="px-2.5">
-                  <div className="text-base sm:text-xl font-black text-emerald-400">
-                    {getSubjectDuration(activeSubject)}
-                  </div>
-                  <div className="text-[10px] text-slate-400 font-sans">
-                    إجمالي المدة
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Search within subject */}
-          <div className="relative max-w-md mr-auto w-full">
-            <input
-              type="text"
-              placeholder="البحث في فيديوهات ومحاضرات هذا المقرر..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pr-10 pl-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:border-rose-500 text-right shadow-xs"
-            />
-            <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-3" />
-          </div>
-
-          {/* 2. Video Cards Grid (بطاقات الفيديوهات) */}
+          {/* Videos List with Inline Circular Download Ring & 3-Dots Menu */}
           {displayedVideos.length === 0 ? (
-            <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 space-y-3">
-              <Film className="w-12 h-12 text-slate-400 mx-auto opacity-40" />
-              <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                لا توجد فيديوهات مرفوعة في هذا المقرر حالياً
+            <div className="text-center py-14 bg-[#161F30] rounded-3xl border border-slate-800/80 p-8 space-y-2.5">
+              <Film className="w-10 h-10 text-slate-500 mx-auto" />
+              <h4 className="text-xs sm:text-sm font-black text-slate-300">
+                لا توجد فيديوهات تطابق البحث الحالي
               </h4>
-              <p className="text-xs text-slate-400">
-                يمكن للمشرف رفع فيديوهات وشروحات جديدة مباشرة عبر زر الرفع أعلاه.
-              </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+            <div className="space-y-2.5">
               {displayedVideos.map((vid, idx) => {
                 const progress = activeDownloads[vid.id];
+                const isDownloading = progress?.status === 'downloading';
                 const isOffline =
                   cachedIds.includes(vid.id) || vid.requiresInternet === false;
+                const isFavorite = favoriteVideoIds.includes(vid.id);
+                const medfurMeta = resolveVideoMedFurMeta(vid);
 
                 return (
                   <div
                     key={vid.id}
-                    className={`group bg-white dark:bg-slate-900 rounded-3xl overflow-hidden border ${
-                      vid.isPinned
-                        ? 'border-amber-500/60 shadow-lg'
-                        : 'border-slate-200 dark:border-slate-800'
-                    } hover:border-rose-500/50 hover:shadow-xl transition-all flex flex-col justify-between min-w-0`}
+                    onClick={() => handlePrimaryVideoClick(vid)}
+                    className="group bg-[#161F30] hover:bg-[#1B263B] border border-slate-800/80 hover:border-emerald-500/40 rounded-2xl p-3.5 sm:p-4 transition-all cursor-pointer flex items-center justify-between gap-3 text-right min-w-0 shadow-xs"
                   >
-                    {/* Thumbnail with duration & size badge */}
-                    <div
-                      onClick={() => handlePlayVideoInApp(vid)}
-                      className="relative aspect-video overflow-hidden bg-slate-950 cursor-pointer flex items-center justify-center"
-                    >
-                      {vid.thumbnail ? (
-                        <img
-                          src={vid.thumbnail}
-                          alt={vid.title}
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-90"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-slate-900 via-rose-950/60 to-slate-950 flex items-center justify-center">
-                          <Film className="w-12 h-12 text-rose-500/40" />
-                        </div>
-                      )}
+                    {/* Right: Video Icon with Download Badge / Circular Progress Ring + Details */}
+                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                      <MediaIconWithCircularProgress
+                        type="video"
+                        formatLabel="MP4"
+                        isDownloaded={isOffline}
+                        isDownloading={isDownloading}
+                        progressPercent={progress?.percent || 0}
+                        onStartOrOpen={() => handlePrimaryVideoClick(vid)}
+                        onCancelDownload={() => cancelManagedDownload(vid.id)}
+                      />
 
-                      {/* Scrim & Play Overlay Button */}
-                      <div className="absolute inset-0 bg-black/30 group-hover:bg-black/15 transition-colors flex items-center justify-center">
-                        <div className="w-12 h-12 rounded-full bg-rose-600/95 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                          <Play className="w-5 h-5 fill-white mr-0.5" />
-                        </div>
-                      </div>
-
-                      {/* Duration & Size Badges */}
-                      <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5">
-                        <div className="bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-lg text-[11px] font-mono text-white flex items-center gap-1.5 shadow-md">
-                          <Clock className="w-3.5 h-3.5 text-rose-400" />
-                          <span>{vid.duration}</span>
-                        </div>
-                        {vid.fileSize && (
-                          <div className="bg-black/80 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-mono text-emerald-300 shadow-md">
-                            {vid.fileSize}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Offline vs Internet Badge */}
-                      {isOffline ? (
-                        <div className="absolute top-2.5 left-2.5 bg-emerald-950/90 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-emerald-300 flex items-center gap-1 shadow-md border border-emerald-500/40">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                          <span>محفوظ مؤقتاً</span>
-                        </div>
-                      ) : (
-                        <div className="absolute top-2.5 left-2.5 bg-slate-900/85 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-amber-300 flex items-center gap-1.5 shadow-md border border-amber-500/30">
-                          <Wifi className="w-3 h-3 text-amber-400" />
-                          <span>بث مباشر</span>
-                        </div>
-                      )}
-
-                      {/* Chapter/Lecture & Pin tag */}
-                      <div className="absolute top-2.5 right-2.5 flex items-center gap-1 max-w-[70%]">
-                        {vid.isPinned && (
-                          <span className="bg-amber-500 text-slate-950 px-2 py-0.5 rounded-lg text-[10px] font-black flex items-center gap-0.5 shadow-xs shrink-0">
-                            <Pin className="w-2.5 h-2.5" />
-                            <span>مثبت</span>
-                          </span>
-                        )}
-                        {vid.chapterName && (
-                          <div className="bg-rose-600/90 backdrop-blur-md px-2.5 py-0.5 rounded-lg text-[10px] font-bold text-white shadow-xs line-clamp-1">
-                            {vid.chapterName}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Video Details */}
-                    <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between space-y-3.5 min-w-0">
-                      <div className="space-y-2 min-w-0">
-                        <h4
-                          onClick={() => handlePlayVideoInApp(vid)}
-                          className="font-black text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors leading-snug line-clamp-2 cursor-pointer break-words"
-                        >
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <h4 className="font-black text-sm sm:text-base text-white group-hover:text-emerald-400 transition-colors leading-snug break-words">
                           {vid.title}
                         </h4>
 
-                        <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="truncate">
-                            المحاضر: {vid.doctorName}
-                          </span>
-                        </p>
-
-                        {vid.description && (
-                          <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed break-words">
-                            {vid.description}
-                          </p>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-slate-400 tabular-nums">
+                          <span>{vid.duration}</span>
+                          {vid.fileSize && (
+                            <>
+                              <span>•</span>
+                              <span>{vid.fileSize}</span>
+                            </>
+                          )}
+                          {vid.doctorName && (
+                            <>
+                              <span>•</span>
+                              <span className="truncate max-w-[160px]">
+                                {vid.doctorName}
+                              </span>
+                            </>
+                          )}
+                          {isDownloading && (
+                            <>
+                              <span>•</span>
+                              <span className="text-emerald-400">
+                                جاري التحميل {progress?.percent || 0}%
+                              </span>
+                            </>
+                          )}
+                          {isFavorite && (
+                            <Heart className="w-3 h-3 text-rose-500 fill-rose-500 inline mr-1" />
+                          )}
+                        </div>
                       </div>
+                    </div>
 
-                      {/* Visual Download & Temporary Cache Status Bar */}
-                      <InlineDownloadStatus
-                        itemId={vid.id}
-                        itemType="video"
-                        progress={progress}
-                        isCached={isOffline}
-                        cachedSize={vid.fileSize}
-                        onStartDownload={() => handleDownloadVideo(null, vid)}
-                        onOpenInApp={() => handlePlayVideoInApp(vid)}
-                        compact
-                      />
-
-                      {/* Action Buttons: زر التشغيل بالمشغل الحديث + زر التنزيل المؤقت + أدوات المشرف */}
-                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
-                        <div className="flex items-center justify-between gap-2">
-                          {/* Play Chooser (In-App or External Player) Button */}
+                    {/* Left: 3-Dots Context Menu + Admin Arrows */}
+                    <div
+                      className="flex items-center gap-1 shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {isAdmin && (
+                        <div className="hidden sm:flex items-center gap-0.5 mr-1">
                           <button
                             type="button"
-                            onClick={() => handlePlayVideoInApp(vid)}
-                            className="flex-1 min-h-[40px] py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all cursor-pointer shadow-sm flex items-center justify-center gap-1.5"
+                            disabled={idx === 0}
+                            onClick={() => moveVideo(vid.id, 'up')}
+                            className="p-1.5 text-slate-400 hover:text-emerald-400 disabled:opacity-30 rounded-lg cursor-pointer"
+                            title="تحريك للأعلى"
                           >
-                            <Play className="w-3.5 h-3.5 fill-white" />
-                            <span>تشغيل (بالتطبيق أو خارجي)</span>
+                            <ArrowUp className="w-3.5 h-3.5" />
                           </button>
-
-                          {/* Real Download Button (App + Device MedFur Name) */}
                           <button
                             type="button"
-                            disabled={progress?.status === 'downloading'}
-                            onClick={(e) => handleDownloadVideo(e, vid)}
-                            className={`min-h-[40px] px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                              isOffline
-                                ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
-                                : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                            }`}
-                            title="تنزيل الفيديو وحفظه داخل التطبيق وفي ملفات الجهاز باسم MedFur"
+                            disabled={idx === displayedVideos.length - 1}
+                            onClick={() => moveVideo(vid.id, 'down')}
+                            className="p-1.5 text-slate-400 hover:text-emerald-400 disabled:opacity-30 rounded-lg cursor-pointer"
+                            title="تحريك للأسفل"
                           >
-                            {progress?.status === 'downloading' ? (
-                              <>
-                                <HardDriveDownload className="w-3.5 h-3.5 animate-bounce" />
-                                <span>{progress.percent}%</span>
-                              </>
-                            ) : isOffline ? (
-                              <>
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                                <span>محفوظ</span>
-                              </>
-                            ) : (
-                              <>
-                                <Download className="w-3.5 h-3.5" />
-                                <span>تنزيل</span>
-                              </>
-                            )}
+                            <ArrowDown className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => togglePinVideo(vid.id)}
+                            className={`p-1.5 rounded-lg cursor-pointer ${
+                              vid.isPinned
+                                ? 'text-amber-400'
+                                : 'text-slate-400 hover:text-amber-400'
+                            }`}
+                            title="تثبيت"
+                          >
+                            <Pin className="w-3.5 h-3.5" />
                           </button>
                         </div>
+                      )}
 
-                        {/* Admin Reorder (Up/Down/Pin) & Edit/Delete */}
-                        {isAdmin && (
-                          <div className="flex items-center justify-between gap-1 bg-slate-100 dark:bg-slate-800/70 rounded-xl p-1.5 border border-slate-200 dark:border-slate-800">
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                disabled={idx === 0}
-                                onClick={() => moveVideo(vid.id, 'up')}
-                                className="p-1.5 text-slate-400 hover:text-emerald-400 disabled:opacity-30 rounded-lg hover:bg-slate-700/60 transition-colors cursor-pointer"
-                                title="تحريك الفيديو للأعلى"
-                              >
-                                <ArrowUp className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                disabled={idx === displayedVideos.length - 1}
-                                onClick={() => moveVideo(vid.id, 'down')}
-                                className="p-1.5 text-slate-400 hover:text-emerald-400 disabled:opacity-30 rounded-lg hover:bg-slate-700/60 transition-colors cursor-pointer"
-                                title="تحريك الفيديو للأسفل"
-                              >
-                                <ArrowDown className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => togglePinVideo(vid.id)}
-                                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                                  vid.isPinned
-                                    ? 'text-amber-400 bg-amber-500/15'
-                                    : 'text-slate-400 hover:text-amber-300 hover:bg-slate-700/60'
-                                }`}
-                                title={
-                                  vid.isPinned
-                                    ? 'إلغاء التثبيت'
-                                    : 'تثبيت الفيديو في المقدمة'
-                                }
-                              >
-                                <Pin className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditVideo(vid)}
-                                className="p-1.5 text-amber-400 hover:bg-amber-500/10 rounded-lg transition-colors cursor-pointer"
-                                title="تعديل بيانات الفيديو"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmDeleteVideo(vid)}
-                                className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
-                                title="حذف الفيديو"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      <MediaThreeDotsMenu
+                        title={vid.title}
+                        isFavorite={isFavorite}
+                        isDownloaded={isOffline}
+                        isAdmin={isAdmin}
+                        onToggleFavorite={() => toggleFavoriteVideo(vid.id)}
+                        onDownloadOffline={() => handleDownloadVideo(null, vid, true)}
+                        onShare={() => handleShareVideo(vid)}
+                        onSendTelegram={() => handleSendVideoTelegram(vid)}
+                        onOpenExternal={() => {
+                          launchMediaInExternalPlayer({
+                            id: vid.id,
+                            url: vid.videoUrl,
+                            fileName: medfurMeta.fileName,
+                            mimeType: vid.mimeType || 'video/mp4',
+                            title: vid.title,
+                          });
+                        }}
+                        onEdit={isAdmin ? () => handleOpenEditVideo(vid) : undefined}
+                        onDelete={
+                          isAdmin ? () => setConfirmDeleteVideo(vid) : undefined
+                        }
+                      />
                     </div>
                   </div>
                 );

@@ -341,10 +341,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [darkModeSchedule, setDarkModeScheduleState] = useState<DarkModeSchedule>(() => {
     const saved = localStorage.getItem('medfur_dark_schedule');
     if (saved === 'system' || saved === 'time' || saved === 'manual') return saved;
-    return 'system';
+    return 'manual';
   });
 
-  // Dark mode by default is true or computed from schedule
+  // Dark mode by default is true (matching MedFur Dark Navy design) or computed from schedule
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     const schedule = localStorage.getItem('medfur_dark_schedule') as DarkModeSchedule | null;
     if (schedule === 'time') {
@@ -353,7 +353,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     const saved = localStorage.getItem('uniportal_theme');
     if (saved) return saved === 'dark';
-    if (typeof window !== 'undefined' && window.matchMedia) {
+    if (schedule === 'system' && typeof window !== 'undefined' && window.matchMedia) {
       return window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
     return true;

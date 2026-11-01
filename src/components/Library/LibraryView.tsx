@@ -1,14 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Folder,
   FolderPlus,
-  FileText,
-  Download,
   Plus,
   Trash2,
   Edit3,
-  ChevronRight,
   ChevronLeft,
   Search,
   BookOpen,
@@ -18,11 +15,17 @@ import {
   Sparkles,
   ArrowUp,
   ArrowDown,
+  ArrowRight,
   Pin,
-  Eye,
-  HardDriveDownload,
   Palette,
   Image as ImageIcon,
+  Cloud,
+  Heart,
+  Home,
+  LayoutGrid,
+  List,
+  FileText,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { LibraryFolderItem, LibraryFileItem } from '../../types';
 import { ConfirmationDialog } from '../Common/ConfirmationDialog';
@@ -40,6 +43,8 @@ import {
   parseFileSizeToBytes,
   removeOfflineMediaRecord,
   StoredMediaRecord,
+  cancelManagedDownload,
+  launchMediaInExternalPlayer,
 } from '../../utils/fileHelpers';
 import {
   InAppMediaViewerModal,
@@ -51,11 +56,21 @@ import {
 } from '../Common/MediaLaunchChoiceModal';
 import {
   DownloadManager,
-  InlineDownloadStatus,
   useDownloadManager,
 } from '../Common/DownloadManager';
-import { getDensityLayoutClasses } from '../../utils/settingsAndDensityLogic';
 import { buildStructuredMedFurFileName } from '../../utils/mediaAndOfflineLogic';
+import {
+  MediaIconWithCircularProgress,
+  MediaThreeDotsMenu,
+} from '../Common/MediaCardControls';
+import {
+  LibraryMainTab,
+  LibrarySortOption,
+  filterAndSortLibraryFiles,
+  sortRootLibraryFolders,
+} from '../../utils/redesignStructureLogic';
+
+const FAVORITE_FILES_STORAGE_KEY = 'medfur_favorite_files_v1';
 
 export const LibraryView: React.FC = () => {
   const {
@@ -73,25 +88,49 @@ export const LibraryView: React.FC = () => {
     deleteLibraryFile,
     moveLibraryFile,
     togglePinLibraryFile,
-    uiDensity,
+    setActiveSection,
   } = useApp();
-
-  const density = getDensityLayoutClasses(uiDensity);
 
   const {
     activeDownloads,
     cachedIds,
-    cachedRecords,
-    isDownloadingCount,
     refreshState,
   } = useDownloadManager();
 
   // Navigation State: current folder id in hierarchy (null = root level)
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [activeLibraryTab, setActiveLibraryTab] = useState<LibraryMainTab>('cloud');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchBar, setShowSearchBar] = useState(false);
   const [selectedFileTypeFilter, setSelectedFileTypeFilter] = useState<string>('الكل');
+  const [sortBy, setSortBy] = useState<LibrarySortOption>('newest');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
   const [isDownloadManagerOpen, setIsDownloadManagerOpen] = useState(false);
+
+  // Favorite file IDs persisted in localStorage
+  const [favoriteFileIds, setFavoriteFileIds] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(FAVORITE_FILES_STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(FAVORITE_FILES_STORAGE_KEY, JSON.stringify(favoriteFileIds));
+    } catch {
+      // ignore storage errors
+    }
+  }, [favoriteFileIds]);
+
+  const toggleFavoriteFile = (fileId: string) => {
+    setFavoriteFileIds((prev) =>
+      prev.includes(fileId) ? prev.filter((id) => id !== fileId) : [...prev, fileId]
+    );
+  };
 
   // Viewer Modal & Launch Choice Modal State
   const [viewerItem, setViewerItem] = useState<InAppViewerItem | null>(null);
@@ -160,46 +199,37 @@ export const LibraryView: React.FC = () => {
     return trail;
   }, [libraryFolders, currentFolderId]);
 
-  // Current sub-folders sorted by Admin orderIndex
+  // Current sub-folders sorted per root priority or orderIndex
   const currentSubFolders = useMemo(() => {
-    return libraryFolders
-      .filter((f) => f.parentId === currentFolderId)
-      .sort((a, b) => (a.orderIndex ?? 9999) - (b.orderIndex ?? 9999));
-  }, [libraryFolders, currentFolderId]);
-
-  // Files in the current folder sorted by Pinned first, then Admin orderIndex
-  const currentFolderFiles = useMemo(() => {
-    if (!currentFolderId) return [];
-    let list = libraryFiles.filter((f) => f.folderId === currentFolderId);
-    if (selectedFileTypeFilter !== 'الكل') {
-      list = list.filter((f) => f.fileType === selectedFileTypeFilter);
+    if (activeLibraryTab !== 'cloud' || searchQuery.trim() !== '') return [];
+    const raw = libraryFolders.filter((f) => f.parentId === currentFolderId);
+    if (currentFolderId === null) {
+      return sortRootLibraryFolders(raw);
     }
-    return [...list].sort((a, b) => {
-      if (Boolean(b.isPinned) !== Boolean(a.isPinned)) {
-        return b.isPinned ? 1 : -1;
-      }
-      return (a.orderIndex ?? 9999) - (b.orderIndex ?? 9999);
-    });
-  }, [libraryFiles, currentFolderId, selectedFileTypeFilter]);
+    return [...raw].sort((a, b) => (a.orderIndex ?? 9999) - (b.orderIndex ?? 9999));
+  }, [libraryFolders, currentFolderId, activeLibraryTab, searchQuery]);
 
-  // Search Results if search query is entered
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    const q = searchQuery.toLowerCase().trim();
-    return libraryFiles
-      .filter(
-        (f) =>
-          f.title.toLowerCase().includes(q) ||
-          f.author.toLowerCase().includes(q) ||
-          f.fileType.toLowerCase().includes(q)
-      )
-      .sort((a, b) => {
-        if (Boolean(b.isPinned) !== Boolean(a.isPinned)) {
-          return b.isPinned ? 1 : -1;
-        }
-        return (a.orderIndex ?? 9999) - (b.orderIndex ?? 9999);
-      });
-  }, [libraryFiles, searchQuery]);
+  // Displayed files filtered by tab, folder, searchQuery, fileType, and sortBy
+  const displayedFiles = useMemo(() => {
+    return filterAndSortLibraryFiles(libraryFiles, {
+      activeTab: activeLibraryTab,
+      currentFolderId,
+      searchQuery,
+      fileTypeFilter: selectedFileTypeFilter,
+      sortBy,
+      downloadedIds: new Set(cachedIds),
+      favoriteIds: new Set(favoriteFileIds),
+    });
+  }, [
+    libraryFiles,
+    activeLibraryTab,
+    currentFolderId,
+    searchQuery,
+    selectedFileTypeFilter,
+    sortBy,
+    cachedIds,
+    favoriteFileIds,
+  ]);
 
   // Resolve structured MedFur naming & virtual path from folder hierarchy
   const resolveFileMedFurMeta = (
@@ -258,28 +288,21 @@ export const LibraryView: React.FC = () => {
     });
   };
 
-  // Show fast chooser modal (In-App vs External Player) when clicking a file
-  const handleOpenFileInApp = (file: LibraryFileItem) => {
-    const medfurMeta = resolveFileMedFurMeta(
-      file.folderId,
-      file.title,
-      file.format || 'pdf'
-    );
-    setLaunchChoiceTarget({
-      id: file.id,
-      type: 'file',
-      title: file.title,
-      subtitle: file.fileType,
-      authorOrDoctor: file.author,
-      fileName: medfurMeta.fileName,
-      virtualPath: medfurMeta.virtualPath,
-      url: file.downloadUrl,
-      mimeType: file.mimeType || 'application/pdf',
-      fileSize: file.fileSize,
-      pages: file.pages,
-      format: file.format || 'PDF',
-      isCachedOffline: cachedIds.includes(file.id),
-    });
+  // Primary click on file card (Pages 2, 4, 5):
+  // - If already downloaded offline -> open directly in In-App Viewer
+  // - If not downloaded yet -> start inline circular download immediately
+  const handlePrimaryFileClick = (file: LibraryFileItem) => {
+    const progress = activeDownloads[file.id];
+    if (progress?.status === 'downloading') {
+      cancelManagedDownload(file.id);
+      return;
+    }
+    const isOffline = cachedIds.includes(file.id);
+    if (isOffline) {
+      openFileDirectlyInApp(file);
+    } else {
+      handleDownloadFile(file);
+    }
   };
 
   // Open from DownloadManager cached record
@@ -299,8 +322,8 @@ export const LibraryView: React.FC = () => {
     });
   };
 
-  // Real Download with Byte Progress Bar, IndexedDB Caching & External Device Save with MedFur Filename
-  const handleDownloadFile = async (file: LibraryFileItem) => {
+  // Real Download with Circular Progress, IndexedDB Caching & External Device Save with MedFur Filename
+  const handleDownloadFile = async (file: LibraryFileItem, saveToDevice = false) => {
     try {
       const expectedBytes =
         file.fileSizeBytes ||
@@ -326,7 +349,7 @@ export const LibraryView: React.FC = () => {
         pages: file.pages,
         format: file.format || 'PDF',
         virtualPath: medfurMeta.virtualPath,
-        saveToDevice: true,
+        saveToDevice,
       });
 
       refreshState();
@@ -334,15 +357,39 @@ export const LibraryView: React.FC = () => {
         downloadsCount: (file.downloadsCount || 0) + 1,
       });
 
-      setDownloadNotice(
-        `تم حفظ الملف داخل التطبيق وتنزيله لجهازك بالاسم المنظم: ${medfurMeta.fileName}`
-      );
-      setTimeout(() => {
-        setDownloadNotice(null);
-      }, 4500);
+      if (saveToDevice) {
+        setDownloadNotice(`تم حفظ الملف وتنزيله للجهاز: ${medfurMeta.fileName}`);
+        setTimeout(() => setDownloadNotice(null), 3500);
+      }
     } catch {
-      // Error state is displayed by InlineDownloadStatus
+      // Cancelled or handled inline
     }
+  };
+
+  const handleShareFile = async (file: LibraryFileItem) => {
+    const shareText = `📄 ${file.title} — المكتبة والأرشيف (MedFur)`;
+    const shareUrl = file.downloadUrl || window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: file.title, text: shareText, url: shareUrl });
+        return;
+      } catch {
+        // fallback to clipboard
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+      setDownloadNotice('تم نسخ رابط ومعلومات الملف للمشاركة ✓');
+      setTimeout(() => setDownloadNotice(null), 3000);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleSendFileTelegram = (file: LibraryFileItem) => {
+    const text = encodeURIComponent(`📄 ${file.title}\nحجم الملف: ${file.fileSize}\nعبر تطبيق MedFur`);
+    const url = encodeURIComponent(file.downloadUrl || window.location.href);
+    window.open(`https://t.me/share/url?url=${url}&text=${text}`, '_blank');
   };
 
   const handleOpenAddFileModal = () => {
@@ -415,7 +462,6 @@ export const LibraryView: React.FC = () => {
   const handleOpenAddFolderModal = () => {
     setFolderToEdit(null);
     setNewFolderName('');
-    // Default to isSubject=true when inside a semester folder
     const currentFld = libraryFolders.find((f) => f.id === currentFolderId);
     const insideSemester = Boolean(
       currentFld && (currentFld.semesterBadge || currentFld.semester) && !currentFld.isSubject
@@ -589,153 +635,93 @@ export const LibraryView: React.FC = () => {
 
   const activeFolder = libraryFolders.find((f) => f.id === currentFolderId);
 
+  const handleTopBackClick = () => {
+    if (currentFolderId !== null) {
+      const parent =
+        libraryFolders.find((f) => f.id === currentFolderId)?.parentId || null;
+      setCurrentFolderId(parent);
+    } else {
+      setActiveSection('home');
+    }
+  };
+
   const renderFileCard = (
     file: LibraryFileItem,
     index: number,
     totalCount: number
   ) => {
     const progress = activeDownloads[file.id];
+    const isDownloading = progress?.status === 'downloading';
     const isOffline = cachedIds.includes(file.id);
+    const isFavorite = favoriteFileIds.includes(file.id);
+    const medfurMeta = resolveFileMedFurMeta(
+      file.folderId,
+      file.title,
+      file.format || 'pdf'
+    );
 
     return (
       <div
         key={file.id}
         dir="rtl"
-        className={`bg-white dark:bg-[#131D2E] hover:border-purple-500/50 border ${
-          file.isPinned
-            ? 'border-amber-500/60 shadow-amber-500/5'
-            : 'border-slate-200 dark:border-slate-800'
-        } rounded-2xl p-3.5 sm:p-4 space-y-3 text-right min-w-0 transition-all shadow-xs`}
+        onClick={() => handlePrimaryFileClick(file)}
+        className="group bg-[#161F30] hover:bg-[#1B263B] border border-slate-800/80 hover:border-emerald-500/40 rounded-2xl p-3.5 sm:p-4 transition-all cursor-pointer flex items-center justify-between gap-3 text-right min-w-0 shadow-xs"
       >
-        {/* Top Row: Icon + File Info */}
-        <div
-          onClick={() => handleOpenFileInApp(file)}
-          className="flex items-start gap-3 cursor-pointer group min-w-0"
-        >
-          <div className="w-11 h-11 rounded-2xl bg-purple-500/15 border border-purple-500/30 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
-            <FileText className="w-5 h-5" />
-          </div>
+        {/* Right: PDF Icon with Download Badge / Circular Progress Ring + Title */}
+        <div className="flex items-center gap-3.5 min-w-0 flex-1">
+          <MediaIconWithCircularProgress
+            type="pdf"
+            formatLabel={file.format || 'PDF'}
+            isDownloaded={isOffline}
+            isDownloading={isDownloading}
+            progressPercent={progress?.percent || 0}
+            onStartOrOpen={() => handlePrimaryFileClick(file)}
+            onCancelDownload={() => cancelManagedDownload(file.id)}
+          />
 
-          <div className="flex-1 min-w-0 space-y-1">
-            <div className="flex items-center gap-1.5 flex-wrap text-[11px] font-bold">
-              <span className="text-purple-600 dark:text-purple-300">
-                {file.fileType}
-              </span>
-              {file.isPinned && (
-                <>
-                  <span className="text-slate-400">·</span>
-                  <span className="text-amber-500 flex items-center gap-0.5">
-                    <Pin className="w-3 h-3" />
-                    <span>مثبت</span>
-                  </span>
-                </>
-              )}
-              {isOffline && (
-                <>
-                  <span className="text-slate-400">·</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5">
-                    <CheckCircle2 className="w-3 h-3" />
-                    <span>محفوظ مؤقتاً</span>
-                  </span>
-                </>
-              )}
-            </div>
-
-            <h4 className="font-black text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors break-words leading-snug">
+          <div className="min-w-0 flex-1 space-y-1">
+            <h4 className="font-black text-sm sm:text-base text-white group-hover:text-emerald-400 transition-colors leading-snug break-words">
               {file.title}
             </h4>
 
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
-              {file.author && (
-                <>
-                  <span className="truncate max-w-[180px]">{file.author}</span>
-                  <span aria-hidden="true">·</span>
-                </>
-              )}
-              <span className="font-bold text-slate-700 dark:text-slate-300">
-                {file.fileSize}
-              </span>
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-slate-400 tabular-nums">
+              <span>{file.fileSize}</span>
+              <span>•</span>
+              <span className="uppercase">{file.format || 'PDF'}</span>
               {file.pages && file.pages > 0 ? (
                 <>
-                  <span aria-hidden="true">·</span>
-                  <span className="text-sky-600 dark:text-sky-300 font-bold">
-                    {file.pages} صفحة
-                  </span>
+                  <span>•</span>
+                  <span>{file.pages} صفحة</span>
                 </>
               ) : null}
-              {file.format && (
+              {isDownloading && (
                 <>
-                  <span aria-hidden="true">·</span>
-                  <span className="uppercase font-mono">{file.format}</span>
+                  <span>•</span>
+                  <span className="text-emerald-400">
+                    جاري التحميل {progress?.percent || 0}%
+                  </span>
                 </>
+              )}
+              {isFavorite && (
+                <Heart className="w-3 h-3 text-rose-500 fill-rose-500 inline mr-1" />
               )}
             </div>
           </div>
         </div>
 
-        {/* Visual Download & Temporary Cache Status Bar inside Library Card */}
-        <InlineDownloadStatus
-          itemId={file.id}
-          itemType="file"
-          progress={progress}
-          isCached={isOffline}
-          cachedSize={file.fileSize}
-          onStartDownload={() => handleDownloadFile(file)}
-          onOpenInApp={() => handleOpenFileInApp(file)}
-        />
-
-        {/* Bottom Action Row: Responsive Full-Width Buttons on Mobile */}
-        <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 flex-1 sm:flex-initial">
-            {/* Open Chooser (In-App or External Player) Button */}
-            <button
-              type="button"
-              onClick={() => handleOpenFileInApp(file)}
-              className="flex-1 sm:flex-initial min-h-[40px] px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-            >
-              <Eye className="w-4 h-4 shrink-0" />
-              <span>فتح (بالتطبيق أو خارجي)</span>
-            </button>
-
-            {/* Real Download with Dual Save (App + Device MedFur Name) Button */}
-            <button
-              type="button"
-              disabled={progress?.status === 'downloading'}
-              onClick={() => handleDownloadFile(file)}
-              className={`flex-1 sm:flex-initial min-h-[40px] px-3.5 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs ${
-                isOffline
-                  ? 'bg-purple-500/15 border border-purple-500/40 text-purple-700 dark:text-purple-300 hover:bg-purple-500/25'
-                  : 'bg-purple-600 hover:bg-purple-700 text-white'
-              }`}
-            >
-              {progress?.status === 'downloading' ? (
-                <>
-                  <HardDriveDownload className="w-4 h-4 animate-bounce shrink-0" />
-                  <span>{progress.percent}%</span>
-                </>
-              ) : isOffline ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>محفوظ · تنزيل نسخة للجهاز</span>
-                </>
-              ) : (
-                <>
-                  <Download className="w-4 h-4 shrink-0" />
-                  <span>تنزيل (للتطبيق والجهاز)</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Admin Toolbar */}
+        {/* Left: 3-Dots Context Menu (Page 3) + Optional Admin Arrows */}
+        <div
+          className="flex items-center gap-1 shrink-0"
+          onClick={(e) => e.stopPropagation()}
+        >
           {isAdmin && (
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-xl p-1 mr-auto sm:mr-0">
+            <div className="hidden sm:flex items-center gap-0.5 mr-1">
               <button
                 type="button"
                 disabled={index === 0}
                 onClick={() => moveLibraryFile(file.id, 'up')}
-                className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-500 disabled:opacity-30 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                title="تحريك الملف للأعلى"
+                className="p-1.5 text-slate-400 hover:text-emerald-400 disabled:opacity-30 rounded-lg cursor-pointer"
+                title="تحريك للأعلى"
               >
                 <ArrowUp className="w-3.5 h-3.5" />
               </button>
@@ -743,55 +729,60 @@ export const LibraryView: React.FC = () => {
                 type="button"
                 disabled={index === totalCount - 1}
                 onClick={() => moveLibraryFile(file.id, 'down')}
-                className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-emerald-500 disabled:opacity-30 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                title="تحريك الملف للأسفل"
+                className="p-1.5 text-slate-400 hover:text-emerald-400 disabled:opacity-30 rounded-lg cursor-pointer"
+                title="تحريك للأسفل"
               >
                 <ArrowDown className="w-3.5 h-3.5" />
               </button>
               <button
                 type="button"
                 onClick={() => togglePinLibraryFile(file.id)}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                  file.isPinned
-                    ? 'text-amber-500 bg-amber-500/15'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-amber-500 hover:bg-white dark:hover:bg-slate-800'
+                className={`p-1.5 rounded-lg cursor-pointer ${
+                  file.isPinned ? 'text-amber-400' : 'text-slate-400 hover:text-amber-400'
                 }`}
-                title={
-                  file.isPinned ? 'إلغاء تثبيت الملف' : 'تثبيت الملف في الأعلى'
-                }
+                title="تثبيت"
               >
                 <Pin className="w-3.5 h-3.5" />
               </button>
-              <button
-                type="button"
-                onClick={() => handleOpenEditFileModal(file)}
-                className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                title="تعديل بيانات الملف"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setConfirmDialog({
-                    isOpen: true,
-                    title: 'حذف الملف الأكاديمي',
-                    message: 'هل أنت متأكد من حذف هذا الملف من المكتبة نهائياً؟',
-                    itemName: file.title,
-                    onConfirm: async () => {
-                      await removeOfflineMediaRecord(file.id);
-                      await deleteLibraryFile(file.id);
-                      refreshState();
-                    },
-                  })
-                }
-                className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-rose-500 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                title="حذف الملف"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
             </div>
           )}
+
+          <MediaThreeDotsMenu
+            title={file.title}
+            isFavorite={isFavorite}
+            isDownloaded={isOffline}
+            isAdmin={isAdmin}
+            onToggleFavorite={() => toggleFavoriteFile(file.id)}
+            onDownloadOffline={() => handleDownloadFile(file, true)}
+            onShare={() => handleShareFile(file)}
+            onSendTelegram={() => handleSendFileTelegram(file)}
+            onOpenExternal={() => {
+              launchMediaInExternalPlayer({
+                id: file.id,
+                url: file.downloadUrl,
+                fileName: medfurMeta.fileName,
+                mimeType: file.mimeType || 'application/pdf',
+                title: file.title,
+              });
+            }}
+            onEdit={isAdmin ? () => handleOpenEditFileModal(file) : undefined}
+            onDelete={
+              isAdmin
+                ? () =>
+                    setConfirmDialog({
+                      isOpen: true,
+                      title: 'حذف الملف الأكاديمي',
+                      message: 'هل أنت متأكد من حذف هذا الملف من المكتبة نهائياً؟',
+                      itemName: file.title,
+                      onConfirm: async () => {
+                        await removeOfflineMediaRecord(file.id);
+                        await deleteLibraryFile(file.id);
+                        refreshState();
+                      },
+                    })
+                : undefined
+            }
+          />
         </div>
       </div>
     );
@@ -800,13 +791,170 @@ export const LibraryView: React.FC = () => {
   return (
     <div
       dir="rtl"
-      className="w-full max-w-6xl mx-auto px-3 sm:px-6 py-3.5 sm:py-5 space-y-4 text-right overflow-x-hidden"
+      className="w-full max-w-4xl mx-auto px-3 sm:px-5 py-3 sm:py-4 space-y-3.5 text-right overflow-x-hidden"
     >
-      {/* Responsive Mobile & Desktop Top Header */}
-      <div className="bg-white dark:bg-[#131D2E] border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 sm:p-4 shadow-xs space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            {currentFolderId && (
+      {/* 1. EMERALD HEADER CARD (Matching Pages 1, 2, 3, 4, 5) */}
+      <div className="bg-gradient-to-l from-emerald-500 via-emerald-600 to-teal-700 text-white rounded-3xl p-4 sm:p-5 shadow-lg space-y-3.5 dark-surface-preserve">
+        <div className="flex items-center justify-between gap-3">
+          {/* Right: Circular Back Button + Title & Subtitle */}
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              type="button"
+              onClick={handleTopBackClick}
+              aria-label="رجوع"
+              className="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors cursor-pointer shrink-0"
+            >
+              <ArrowRight className="w-5 h-5" />
+            </button>
+
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-xl font-black text-white leading-tight truncate">
+                المكتبة والأرشيف
+              </h1>
+              <p className="text-xs text-emerald-50/90 font-bold truncate mt-0.5">
+                {activeFolder
+                  ? `📁 ${activeFolder.name}`
+                  : 'ملفات ومراجع الكلية بمكان واحد'}
+              </p>
+            </div>
+          </div>
+
+          {/* Left: Circular Search Button + Admin Upload Buttons */}
+          <div className="flex items-center gap-2 shrink-0">
+            {isAdmin && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleOpenAddFolderModal}
+                  className="px-3 py-2 rounded-2xl bg-white/20 hover:bg-white/30 text-white text-xs font-black flex items-center gap-1 cursor-pointer"
+                  title="إضافة مجلد"
+                >
+                  <FolderPlus className="w-4 h-4" />
+                  <span className="hidden sm:inline">مجلد</span>
+                </button>
+                {currentFolderId && (
+                  <button
+                    type="button"
+                    onClick={handleOpenAddFileModal}
+                    className="px-3 py-2 rounded-2xl bg-white text-emerald-700 hover:bg-emerald-50 text-xs font-black flex items-center gap-1 cursor-pointer shadow-xs"
+                    title="رفع ملف"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="hidden sm:inline">رفع ملف</span>
+                  </button>
+                )}
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowSearchBar((prev) => !prev)}
+              aria-label="بحث في المكتبة"
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors cursor-pointer ${
+                showSearchBar || searchQuery
+                  ? 'bg-white text-emerald-700'
+                  : 'bg-white/20 hover:bg-white/30 text-white'
+              }`}
+            >
+              <Search className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Optional Collapsible Search Input */}
+        {(showSearchBar || searchQuery.trim() !== '') && (
+          <div className="relative animate-in fade-in duration-150">
+            <Search className="w-4 h-4 text-white/70 absolute right-3.5 top-3 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="ابحث عن ملف أو محاضرة أو مرجع..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pr-10 pl-9 py-2.5 rounded-2xl bg-black/25 border border-white/20 text-xs sm:text-sm font-bold text-white placeholder:text-white/70 focus:outline-hidden focus:border-white"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute left-3 top-2.5 text-white/80 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Bottom Stat Pills inside Emerald Header */}
+        <div className="flex items-center gap-2 flex-wrap pt-0.5">
+          <div className="px-3.5 py-1.5 rounded-full bg-black/20 text-white text-xs font-black flex items-center gap-1.5 tabular-nums">
+            <Folder className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+            <span>{currentSubFolders.length} مجلد</span>
+          </div>
+          <div className="px-3.5 py-1.5 rounded-full bg-black/20 text-white text-xs font-black flex items-center gap-1.5 tabular-nums">
+            <FileText className="w-3.5 h-3.5 text-emerald-200" />
+            <span>{displayedFiles.length} ملف</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. NAVIGATION CARD: 3 Tabs (السحابية | تنزيلاتي | مفضلتي) + Breadcrumb Bar */}
+      <div className="bg-[#161F30] border border-slate-800/80 rounded-3xl p-2.5 sm:p-3 space-y-2.5 shadow-sm">
+        {/* Row 1: 3 Main Tabs */}
+        <div className="grid grid-cols-3 gap-1.5">
+          <button
+            type="button"
+            onClick={() => setActiveLibraryTab('cloud')}
+            className={`py-2.5 px-3 rounded-2xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              activeLibraryTab === 'cloud'
+                ? 'bg-emerald-500 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+            }`}
+          >
+            <Cloud className="w-4 h-4" />
+            <span>السحابية</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveLibraryTab('downloads')}
+            className={`py-2.5 px-3 rounded-2xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              activeLibraryTab === 'downloads'
+                ? 'bg-emerald-500 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+            }`}
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            <span>تنزيلاتي</span>
+            {cachedIds.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-black/25 text-[10px] tabular-nums">
+                {cachedIds.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveLibraryTab('favorites')}
+            className={`py-2.5 px-3 rounded-2xl text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              activeLibraryTab === 'favorites'
+                ? 'bg-emerald-500 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+            }`}
+          >
+            <Heart className="w-4 h-4" />
+            <span>مفضلتي</span>
+            {favoriteFileIds.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-black/25 text-[10px] tabular-nums">
+                {favoriteFileIds.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Row 2: Breadcrumb Bar */}
+        {activeLibraryTab === 'cloud' && (
+          <div className="bg-[#0F1726] border border-slate-800/70 rounded-2xl px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-xs">
+            {currentFolderId !== null && (
               <button
                 type="button"
                 onClick={() => {
@@ -815,554 +963,279 @@ export const LibraryView: React.FC = () => {
                       ?.parentId || null;
                   setCurrentFolderId(parent);
                 }}
-                className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors cursor-pointer flex items-center gap-1 text-xs font-bold shrink-0"
-                title="الرجوع للمجلد السابق"
+                className="w-7 h-7 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 flex items-center justify-center shrink-0 cursor-pointer ml-1"
+                title="رجوع للمجلد السابق"
               >
-                <ChevronRight className="w-4 h-4" />
-                <span>رجوع</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             )}
 
-            <div className="min-w-0">
-              <h1 className="text-sm sm:text-xl font-black text-slate-900 dark:text-white truncate">
-                المكتبة والأرشيف الأكاديمي
-              </h1>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                {activeFolder
-                  ? `المجلد الحالي: ${activeFolder.name}`
-                  : 'تصفح المحاضرات والنوط والدورات مع الحفظ المؤقت بدون إنترنت'}
-              </p>
-            </div>
-          </div>
-
-          {/* Action Buttons: Download Manager + Admin Controls */}
-          <div className="flex items-center gap-1.5 flex-wrap shrink-0">
             <button
               type="button"
-              onClick={() => setIsDownloadManagerOpen(true)}
-              className="min-h-[38px] px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-200 dark:border-slate-700"
-              title="إدارة التنزيلات والملفات المحفوظة مؤقتاً"
+              onClick={() => setCurrentFolderId(null)}
+              className={`px-2.5 py-1 rounded-xl font-black flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-colors ${
+                currentFolderId === null
+                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
             >
-              <HardDriveDownload
-                className={`w-4 h-4 text-emerald-500 ${
-                  isDownloadingCount > 0 ? 'animate-bounce' : ''
-                }`}
-              />
-              <span>مدير التنزيلات</span>
-              <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 text-[10px] font-black tabular-nums">
-                {cachedRecords.length}
-              </span>
+              <Home className="w-3.5 h-3.5" />
+              <span>الرئيسية</span>
             </button>
 
-            {isAdmin && (
-              <>
-                <button
-                  type="button"
-                  onClick={handleOpenAddFolderModal}
-                  className="min-h-[38px] px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                  title="إضافة مجلد جديد وتخصيص غلافه"
-                >
-                  <FolderPlus className="w-4 h-4 shrink-0" />
-                  <span>إضافة مجلد</span>
-                </button>
-
-                {currentFolderId && (
+            {breadcrumbTrail.map((crumb, idx) => {
+              const isLast = idx === breadcrumbTrail.length - 1;
+              return (
+                <React.Fragment key={crumb.id}>
+                  <ChevronLeft className="w-3.5 h-3.5 text-slate-600 shrink-0" />
                   <button
                     type="button"
-                    onClick={handleOpenAddFileModal}
-                    className="min-h-[38px] px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                    title="إضافة ملف داخل هذا المجلد"
+                    onClick={() => setCurrentFolderId(crumb.id)}
+                    className={`px-2.5 py-1 rounded-xl whitespace-nowrap cursor-pointer transition-colors ${
+                      isLast
+                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-black'
+                        : 'text-slate-400 hover:text-white font-bold'
+                    }`}
                   >
-                    <Plus className="w-4 h-4 shrink-0" />
-                    <span>رفع ملف</span>
+                    {crumb.name}
                   </button>
-                )}
-              </>
-            )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 3. FILTER, SORT & VIEW MODE BAR */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {/* File Type Filter Select */}
+          <select
+            value={selectedFileTypeFilter}
+            onChange={(e) => setSelectedFileTypeFilter(e.target.value)}
+            aria-label="تصفية حسب نوع الملف"
+            className="px-3.5 py-2 rounded-2xl bg-[#161F30] border border-slate-800/80 text-xs font-black text-slate-200 focus:outline-hidden focus:border-emerald-500 cursor-pointer"
+          >
+            <option value="الكل">كل الملفات</option>
+            <option value="محاضرة">محاضرات</option>
+            <option value="تفريغ / نوطة">تفريغ / نوطة</option>
+            <option value="سلايدات">سلايدات</option>
+            <option value="كتاب / مرجع">كتاب / مرجع</option>
+          </select>
+
+          {/* Sort Select */}
+          <div className="relative flex items-center">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as LibrarySortOption)}
+              aria-label="ترتيب الملفات"
+              className="px-3.5 py-2 rounded-2xl bg-[#161F30] border border-slate-800/80 text-xs font-black text-slate-200 focus:outline-hidden focus:border-emerald-500 cursor-pointer"
+            >
+              <option value="newest">ترتيب: الأحدث</option>
+              <option value="alpha">ترتيب: أبجدياً</option>
+              <option value="size">ترتيب: الحجم</option>
+            </select>
           </div>
         </div>
 
-        {/* File Search Bar */}
-        <div className="relative">
-          <Search className="absolute right-3.5 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="ابحث عن نوطة، تفريغ، دورة امتحانية، أو اسم المادة..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pr-10 pl-12 py-2.5 bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:border-purple-500"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="absolute left-3 top-2.5 text-xs font-bold text-slate-400 hover:text-rose-500 cursor-pointer"
-            >
-              مسح
-            </button>
+        {/* Grid / List View Toggle */}
+        <button
+          type="button"
+          onClick={() => setViewMode((prev) => (prev === 'list' ? 'grid' : 'list'))}
+          aria-label="تغيير طريقة العرض"
+          className="w-10 h-10 rounded-2xl bg-[#161F30] border border-slate-800/80 text-slate-300 hover:text-emerald-400 flex items-center justify-center transition-colors cursor-pointer"
+        >
+          {viewMode === 'list' ? (
+            <LayoutGrid className="w-4 h-4" />
+          ) : (
+            <List className="w-4 h-4" />
           )}
-        </div>
-
-        {/* Breadcrumbs Navigation Strip */}
-        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 overflow-x-auto pb-0.5 no-scrollbar">
-          <button
-            type="button"
-            onClick={() => setCurrentFolderId(null)}
-            className={`hover:text-purple-500 font-bold whitespace-nowrap cursor-pointer ${
-              currentFolderId === null
-                ? 'text-purple-600 dark:text-purple-400 font-black'
-                : ''
-            }`}
-          >
-            الرئيسية (المكتبة)
-          </button>
-
-          {breadcrumbTrail.map((crumb, idx) => {
-            const isLast = idx === breadcrumbTrail.length - 1;
-            return (
-              <React.Fragment key={crumb.id}>
-                <span className="text-slate-400">/</span>
-                <button
-                  type="button"
-                  onClick={() => setCurrentFolderId(crumb.id)}
-                  className={`hover:text-purple-500 whitespace-nowrap cursor-pointer ${
-                    isLast
-                      ? 'text-purple-600 dark:text-purple-400 font-black'
-                      : 'font-semibold'
-                  }`}
-                >
-                  {crumb.name}
-                </button>
-              </React.Fragment>
-            );
-          })}
-        </div>
+        </button>
       </div>
 
+      {/* Toast Notice */}
       {downloadNotice && (
-        <div className="p-3.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-200 text-xs font-bold flex items-center justify-between gap-2 animate-in fade-in">
+        <div className="p-3.5 rounded-2xl bg-emerald-950/90 border border-emerald-500/40 text-emerald-200 text-xs font-bold flex items-center justify-between gap-2 animate-in fade-in">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>{downloadNotice}</span>
           </div>
-          <button
-            type="button"
-            onClick={() => setIsDownloadManagerOpen(true)}
-            className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-bold shrink-0 cursor-pointer"
+        </div>
+      )}
+
+      {/* 4. FOLDERS & FILES CONTENT */}
+      <div className="space-y-2.5">
+        {/* Sub-Folders List (Clean dark cards matching Page 1) */}
+        {currentSubFolders.length > 0 && (
+          <div
+            className={
+              viewMode === 'grid'
+                ? 'grid grid-cols-1 sm:grid-cols-2 gap-2.5'
+                : 'space-y-2.5'
+            }
           >
-            عرض التنزيلات
-          </button>
-        </div>
-      )}
+            {currentSubFolders.map((fld, idx) => {
+              const isSubjectFolder = Boolean(fld.isSubject || fld.subjectId);
+              const linkedSubject = fld.subjectId
+                ? subjects.find((s) => s.id === fld.subjectId)
+                : undefined;
+              const resolvedMedical = isSubjectFolder
+                ? resolveSubjectMedicalIcon({
+                    name: fld.name,
+                    icon: fld.icon || linkedSubject?.icon || '',
+                    color: fld.coverColor || linkedSubject?.color,
+                    department: fld.department || linkedSubject?.department,
+                  })
+                : null;
 
-      {/* SEARCH RESULTS VIEW */}
-      {searchQuery.trim() !== '' ? (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400">
-            <span>نتائج البحث ({searchResults.length}):</span>
-          </div>
-
-          {searchResults.length === 0 ? (
-            <div className="text-center py-12 bg-white dark:bg-[#131D2E] rounded-3xl border border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
-              لم يتم العثور على أي ملفات تطابق &quot;{searchQuery}&quot;
-            </div>
-          ) : (
-            <div className={density.libraryFilesGrid}>
-              {searchResults.map((file, idx) =>
-                renderFileCard(file, idx, searchResults.length)
-              )}
-            </div>
-          )}
-        </div>
-      ) : (
-        /* HIERARCHICAL FOLDERS & FILES VIEW */
-        <div className="space-y-5">
-          {/* Sub-Folders Grid */}
-          {currentSubFolders.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-                <h3 className="text-xs sm:text-sm font-black text-slate-600 dark:text-slate-300">
-                  {currentFolderId === null
-                    ? 'المجلدات والسنوات الدراسية:'
-                    : 'المجلدات الفرعية والمقررات:'}
-                </h3>
-                {isAdmin && (
-                  <span className="text-[11px] text-slate-400 font-bold">
-                    ترتيب المجلدات متاح بأسهم (↑ ↓)
-                  </span>
-                )}
-              </div>
-
-              <div className={density.libraryFoldersGrid}>
-                {currentSubFolders.map((fld, idx) => {
-                  const childFolderCount = libraryFolders.filter(
-                    (f) => f.parentId === fld.id
-                  ).length;
-                  const childFileCount = libraryFiles.filter(
-                    (f) => f.folderId === fld.id
-                  ).length;
-
-                  const isRootYearFolder = fld.parentId === null;
-                  const isSubjectFolder = Boolean(fld.isSubject || fld.subjectId);
-                  const semBadge: '1' | '2' | null =
-                    !isRootYearFolder && !isSubjectFolder
-                      ? fld.semesterBadge ||
-                        (fld.semester === 'first'
-                          ? '1'
-                          : fld.semester === 'second'
-                          ? '2'
-                          : null)
-                      : null;
-
-                  // Resolve medical icon & accent color for Subject folders (identical to Automation Bank)
-                  const linkedSubject = fld.subjectId
-                    ? subjects.find((s) => s.id === fld.subjectId)
-                    : undefined;
-                  const resolvedMedical = isSubjectFolder
-                    ? resolveSubjectMedicalIcon({
-                        name: fld.name,
-                        icon: fld.icon || linkedSubject?.icon || '',
-                        color: fld.coverColor || linkedSubject?.color,
-                        department: fld.department || linkedSubject?.department,
-                      })
-                    : null;
-
-                  const activeAccentColor =
-                    fld.coverColor ||
-                    resolvedMedical?.accentColor ||
-                    (semBadge === '1'
-                      ? '#10B981'
-                      : semBadge === '2'
-                      ? '#0EA5E9'
-                      : undefined);
-
-                  const hasCustomBanner = Boolean(fld.coverImage || fld.coverLabel);
-
-                  return (
-                    <div
-                      key={fld.id}
-                      onClick={() => setCurrentFolderId(fld.id)}
-                      style={
-                        activeAccentColor && !isRootYearFolder
-                          ? { borderColor: `${activeAccentColor}35` }
-                          : undefined
-                      }
-                      className="group bg-white dark:bg-[#131D2E] hover:border-purple-500/50 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden transition-all duration-200 cursor-pointer flex flex-col justify-between shadow-xs"
-                    >
-                      {/* Optional Custom Folder Cover Banner (when coverImage or coverLabel is customized) */}
-                      {hasCustomBanner && (
-                        <div
-                          style={
-                            fld.coverImage
-                              ? {
-                                  backgroundImage: `linear-gradient(to bottom, rgba(15,23,42,0.35), rgba(15,23,42,0.85)), url(${fld.coverImage})`,
-                                  backgroundSize: 'cover',
-                                  backgroundPosition: 'center',
-                                }
-                              : activeAccentColor
-                              ? {
-                                  background: `linear-gradient(135deg, ${activeAccentColor}33 0%, rgba(15,23,42,0.9) 100%)`,
-                                }
-                              : undefined
-                          }
-                          className="h-14 px-3.5 py-2 flex items-center justify-between border-b border-slate-200/50 dark:border-slate-800/80 bg-gradient-to-l from-purple-600/25 to-slate-900"
-                        >
-                          <span className="px-2 py-0.5 rounded-lg bg-black/45 backdrop-blur-xs text-[10px] font-black text-white border border-white/15">
-                            {fld.coverLabel || (isSubjectFolder ? 'مادة دراسية' : 'مجلد مخصص')}
-                          </span>
-                          {isSubjectFolder && (
-                            <span className="text-[10px] font-bold text-slate-200 truncate max-w-[140px]">
-                              {fld.department || linkedSubject?.department || 'مقرر أكاديمي'}
-                            </span>
-                          )}
-                        </div>
+              return (
+                <div
+                  key={fld.id}
+                  onClick={() => setCurrentFolderId(fld.id)}
+                  className="group bg-[#161F30] hover:bg-[#1B263B] border border-slate-800/80 hover:border-emerald-500/40 rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-3 cursor-pointer transition-all shadow-xs"
+                >
+                  <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 flex items-center justify-center shrink-0">
+                      {isSubjectFolder && resolvedMedical ? (
+                        <SubjectMedicalIcon
+                          subject={{
+                            name: fld.name,
+                            icon: fld.icon || linkedSubject?.icon || '',
+                            color: resolvedMedical.accentColor,
+                            department: fld.department || linkedSubject?.department,
+                          }}
+                          className="w-6 h-6"
+                        />
+                      ) : (
+                        <Folder className="w-6 h-6 text-emerald-400 fill-emerald-400/20" />
                       )}
-
-                      <div className="p-3.5 sm:p-4 flex flex-col justify-between gap-3 flex-1">
-                        {/* Primary Folder Row: Icon + Name + Count + Chevron */}
-                        <div className="flex items-center justify-between gap-3 min-w-0">
-                          <div className="flex items-center gap-3 min-w-0 flex-1">
-                            {/* Folder Icon Box:
-                                1. Root Year Folders -> Kept as standard Folder icon
-                                2. Semester Folders -> Bold '1' or '2' badge + Folder
-                                3. Subject Folders -> Exact Automation Bank SubjectMedicalIcon & Color */}
-                            {isRootYearFolder && !isSubjectFolder ? (
-                              <div
-                                style={
-                                  fld.coverColor
-                                    ? {
-                                        backgroundColor: `${fld.coverColor}20`,
-                                        borderColor: `${fld.coverColor}45`,
-                                        color: fld.coverColor,
-                                      }
-                                    : undefined
-                                }
-                                className="w-11 h-11 rounded-2xl bg-purple-500/15 border border-purple-500/25 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0"
-                              >
-                                <Folder className="w-5 h-5" />
-                              </div>
-                            ) : semBadge ? (
-                              <div
-                                className={`relative w-11 h-11 rounded-2xl border flex items-center justify-center shrink-0 ${
-                                  semBadge === '1'
-                                    ? 'bg-emerald-500/15 border-emerald-500/35 text-emerald-500 dark:text-emerald-400'
-                                    : 'bg-sky-500/15 border-sky-500/35 text-sky-500 dark:text-sky-400'
-                                }`}
-                              >
-                                <Folder className="w-5 h-5 opacity-25" />
-                                <span className="absolute inset-0 flex items-center justify-center font-black text-base tabular-nums">
-                                  {semBadge}
-                                </span>
-                              </div>
-                            ) : isSubjectFolder ? (
-                              <div
-                                style={
-                                  activeAccentColor
-                                    ? {
-                                        backgroundColor: `${activeAccentColor}20`,
-                                        borderColor: `${activeAccentColor}45`,
-                                        color: activeAccentColor,
-                                      }
-                                    : undefined
-                                }
-                                className="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 flex items-center justify-center shrink-0"
-                              >
-                                <SubjectMedicalIcon
-                                  subject={{
-                                    name: fld.name,
-                                    icon: fld.icon || linkedSubject?.icon || '',
-                                    color: activeAccentColor,
-                                    department: fld.department || linkedSubject?.department,
-                                  }}
-                                  className="w-5 h-5"
-                                />
-                              </div>
-                            ) : (
-                              <div
-                                style={
-                                  activeAccentColor
-                                    ? {
-                                        backgroundColor: `${activeAccentColor}20`,
-                                        borderColor: `${activeAccentColor}45`,
-                                        color: activeAccentColor,
-                                      }
-                                    : undefined
-                                }
-                                className="w-11 h-11 rounded-2xl bg-purple-500/15 border border-purple-500/25 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0"
-                              >
-                                <Folder className="w-5 h-5" />
-                              </div>
-                            )}
-
-                            <div className="min-w-0 flex-1">
-                              {renamingFolderId === fld.id ? (
-                                <div
-                                  className="flex items-center gap-1.5"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <input
-                                    type="text"
-                                    value={renamedFolderName}
-                                    onChange={(e) =>
-                                      setRenamedFolderName(e.target.value)
-                                    }
-                                    className="w-full px-2.5 py-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRenameFolder(fld.id)}
-                                    className="px-2.5 py-1.5 bg-purple-600 text-white text-xs rounded-xl font-bold cursor-pointer shrink-0"
-                                  >
-                                    حفظ
-                                  </button>
-                                </div>
-                              ) : (
-                                <>
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <h4 className="font-black text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors break-words leading-snug">
-                                      {fld.name}
-                                    </h4>
-                                    {semBadge && (
-                                      <span
-                                        className={`px-2 py-0.5 rounded-lg text-[10px] font-black tabular-nums border ${
-                                          semBadge === '1'
-                                            ? 'bg-emerald-500/15 border-emerald-500/35 text-emerald-600 dark:text-emerald-300'
-                                            : 'bg-sky-500/15 border-sky-500/35 text-sky-600 dark:text-sky-300'
-                                        }`}
-                                      >
-                                        فصل {semBadge}
-                                      </span>
-                                    )}
-                                    {isSubjectFolder && (
-                                      <span
-                                        style={
-                                          activeAccentColor
-                                            ? {
-                                                backgroundColor: `${activeAccentColor}18`,
-                                                borderColor: `${activeAccentColor}40`,
-                                                color: activeAccentColor,
-                                              }
-                                            : undefined
-                                        }
-                                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold border bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
-                                      >
-                                        مادة
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums block mt-0.5">
-                                    {childFolderCount > 0 && childFileCount > 0
-                                      ? `${childFolderCount} مجلد فرعي · ${childFileCount} ملف`
-                                      : childFolderCount > 0
-                                      ? `${childFolderCount} ${isRootYearFolder ? 'فصل دراسي' : 'مادة / مجلد فرعي'}`
-                                      : `${childFileCount} ملف مرفوع`}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          <ChevronLeft className="w-4 h-4 text-slate-400 group-hover:text-purple-500 transition-colors shrink-0" />
-                        </div>
-
-                        {/* Admin Controls Strip */}
-                        {isAdmin && (
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between gap-1"
-                          >
-                            <span className="text-[10px] text-slate-400 font-bold">
-                              إدارة وتخصيص:
-                            </span>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                disabled={idx === 0}
-                                onClick={() => moveLibraryFolder(fld.id, 'up')}
-                                className="text-slate-500 dark:text-slate-400 hover:text-emerald-500 disabled:opacity-30 p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/70 cursor-pointer"
-                                title="تحريك المجلد للأعلى"
-                              >
-                                <ArrowUp className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                disabled={idx === currentSubFolders.length - 1}
-                                onClick={() => moveLibraryFolder(fld.id, 'down')}
-                                className="text-slate-500 dark:text-slate-400 hover:text-emerald-500 disabled:opacity-30 p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/70 cursor-pointer"
-                                title="تحريك المجلد للأسفل"
-                              >
-                                <ArrowDown className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditFolderModal(fld)}
-                                className="text-slate-500 dark:text-slate-400 hover:text-purple-500 p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/70 cursor-pointer"
-                                title="تعديل المجلد وتخصيص الغلاف أو الرمز"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setConfirmDialog({
-                                    isOpen: true,
-                                    title: 'حذف المجلد ومحتوياته',
-                                    message:
-                                      'هل أنت متأكد من حذف هذا المجلد وجميع المجلدات الفرعية والملفات الموجودة بداخله؟',
-                                    itemName: fld.name,
-                                    onConfirm: () => deleteLibraryFolder(fld.id),
-                                  })
-                                }
-                                className="text-slate-500 dark:text-slate-400 hover:text-rose-500 p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/70 cursor-pointer"
-                                title="حذف المجلد"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
-          {/* Files List in Current Folder */}
-          {currentFolderId !== null && (
-            <div className="space-y-3 pt-1">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs font-bold text-slate-500 dark:text-slate-400">
-                {/* Filter Tabs */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
-                  {(
-                    [
-                      'الكل',
-                      'محاضرة',
-                      'تفريغ / نوطة',
-                      'سلايدات',
-                      'كتاب / مرجع',
-                      'دورة امتحانية',
-                    ] as const
-                  ).map((typeOpt) => (
-                    <button
-                      key={typeOpt}
-                      type="button"
-                      onClick={() => setSelectedFileTypeFilter(typeOpt)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
-                        selectedFileTypeFilter === typeOpt
-                          ? 'bg-purple-600 text-white shadow-xs'
-                          : 'bg-white dark:bg-[#131D2E] border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      {typeOpt}
-                    </button>
-                  ))}
-                </div>
+                    <div className="min-w-0 flex-1">
+                      {renamingFolderId === fld.id ? (
+                        <div
+                          className="flex items-center gap-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="text"
+                            value={renamedFolderName}
+                            onChange={(e) => setRenamedFolderName(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRenameFolder(fld.id)}
+                            className="px-2.5 py-1.5 bg-emerald-600 text-white text-xs rounded-xl font-bold cursor-pointer shrink-0"
+                          >
+                            حفظ
+                          </button>
+                        </div>
+                      ) : (
+                        <h4 className="font-black text-sm sm:text-base text-white group-hover:text-emerald-400 transition-colors break-words">
+                          {fld.name}
+                        </h4>
+                      )}
+                    </div>
+                  </div>
 
-                <div className="flex items-center justify-between sm:justify-end gap-3 px-1">
-                  <span>الملفات المتاحة ({currentFolderFiles.length})</span>
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      onClick={handleOpenAddFileModal}
-                      className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer font-black"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>رفع ملف جديد</span>
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isAdmin && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-1 ml-1"
+                      >
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => moveLibraryFolder(fld.id, 'up')}
+                          className="p-1.5 text-slate-400 hover:text-emerald-400 disabled:opacity-30 rounded-lg cursor-pointer"
+                          title="تحريك للأعلى"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === currentSubFolders.length - 1}
+                          onClick={() => moveLibraryFolder(fld.id, 'down')}
+                          className="p-1.5 text-slate-400 hover:text-emerald-400 disabled:opacity-30 rounded-lg cursor-pointer"
+                          title="تحريك للأسفل"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditFolderModal(fld)}
+                          className="p-1.5 text-slate-400 hover:text-emerald-400 rounded-lg cursor-pointer"
+                          title="تعديل المجلد"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setConfirmDialog({
+                              isOpen: true,
+                              title: 'حذف المجلد ومحتوياته',
+                              message:
+                                'هل أنت متأكد من حذف هذا المجلد وجميع المجلدات الفرعية والملفات الموجودة بداخله؟',
+                              itemName: fld.name,
+                              onConfirm: () => deleteLibraryFolder(fld.id),
+                            })
+                          }
+                          className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg cursor-pointer"
+                          title="حذف المجلد"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                    <ChevronLeft className="w-5 h-5 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+                  </div>
                 </div>
-              </div>
+              );
+            })}
+          </div>
+        )}
 
-              {currentFolderFiles.length === 0 &&
-              currentSubFolders.length === 0 ? (
-                <div className="text-center py-12 bg-white dark:bg-[#131D2E] rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 p-6 space-y-2.5">
-                  <BookOpen className="w-9 h-9 text-slate-400 mx-auto" />
-                  <p className="text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-300">
-                    لا توجد ملفات مرفوعة في هذا المجلد حالياً.
-                  </p>
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      onClick={handleOpenAddFileModal}
-                      className="mt-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold cursor-pointer"
-                    >
-                      رفع أول ملف أو نوطة من الجهاز
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className={density.libraryFilesGrid}>
-                  {currentFolderFiles.map((file, idx) =>
-                    renderFileCard(file, idx, currentFolderFiles.length)
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+        {/* Files List */}
+        {displayedFiles.length > 0 && (
+          <div
+            className={
+              viewMode === 'grid'
+                ? 'grid grid-cols-1 sm:grid-cols-2 gap-2.5'
+                : 'space-y-2.5'
+            }
+          >
+            {displayedFiles.map((file, idx) =>
+              renderFileCard(file, idx, displayedFiles.length)
+            )}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {currentSubFolders.length === 0 && displayedFiles.length === 0 && (
+          <div className="text-center py-14 bg-[#161F30] rounded-3xl border border-slate-800/80 p-6 space-y-2.5">
+            <BookOpen className="w-10 h-10 text-slate-500 mx-auto" />
+            <p className="text-xs sm:text-sm font-black text-slate-300">
+              {activeLibraryTab === 'downloads'
+                ? 'لا توجد ملفات محملة أوفلاين بعد'
+                : activeLibraryTab === 'favorites'
+                  ? 'لا توجد ملفات مضافة للمفضلة بعد'
+                  : 'لا توجد ملفات أو مجلدات في هذا المسار حالياً'}
+            </p>
+            {isAdmin && activeLibraryTab === 'cloud' && currentFolderId && (
+              <button
+                type="button"
+                onClick={handleOpenAddFileModal}
+                className="mt-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+              >
+                رفع أول ملف في هذا المجلد
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Add / Edit Folder Modal with Custom Cover & Subject Toggle */}
       {isAddFolderModalOpen && (

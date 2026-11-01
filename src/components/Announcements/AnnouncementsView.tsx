@@ -11,7 +11,8 @@ import {
   GraduationCap,
   BookOpen,
   Users,
-  ChevronRight
+  ChevronRight,
+  ArrowRight,
 } from 'lucide-react';
 import { AnnouncementItem } from '../../types';
 import { ConfirmationDialog } from '../Common/ConfirmationDialog';
@@ -87,11 +88,27 @@ export const AnnouncementsView: React.FC = () => {
   return (
     <div className="w-full max-w-md mx-auto sm:max-w-3xl lg:max-w-4xl px-3.5 py-3.5 space-y-4 text-right overflow-x-hidden">
       
-      {/* Compact Sub-page Top Navigation Row (Click MedFur in top header to return Home) */}
-      <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800 gap-2">
-        <h1 className="text-sm sm:text-lg font-black text-emerald-400 truncate">
-          {activeSection === 'about' ? 'من نحن ودليل الكلية' : 'دليل الكلية والإعلانات'}
-        </h1>
+      {/* Emerald Header Card with Back Button */}
+      <div className="bg-gradient-to-l from-emerald-500 via-emerald-600 to-teal-700 text-white rounded-3xl p-4 sm:p-5 shadow-lg flex items-center justify-between gap-2 dark-surface-preserve">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={() => setActiveSection('home')}
+            aria-label="العودة للرئيسية"
+            title="العودة للرئيسية"
+            className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 flex items-center justify-center text-white transition-all cursor-pointer shrink-0"
+          >
+            <ArrowRight className="w-5 h-5" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-base sm:text-xl font-black text-white truncate">
+              {activeSection === 'about' ? 'من نحن ودليل الكلية' : 'دليل الكلية والإعلانات'}
+            </h1>
+            <p className="text-[11px] sm:text-xs text-emerald-50/90 font-semibold truncate">
+              إعلانات الكلية الرسمية ودليل الطالب الأكاديمي
+            </p>
+          </div>
+        </div>
 
         {isAdmin && (
           <button

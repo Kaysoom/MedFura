@@ -44,6 +44,8 @@ import {
   FileCode2,
   Palette,
   Download,
+  ArrowRight,
+  Heart,
 } from 'lucide-react';
 import {
   SubjectItem,
@@ -84,6 +86,10 @@ import {
   saveOfflineAutomationPackToStorage,
   OfflineAutomationStatusMap,
 } from '../../utils/mediaAndOfflineLogic';
+import {
+  SubjectQuickFilterTab,
+  getSubjectQuickTabQuestions,
+} from '../../utils/redesignStructureLogic';
 import confetti from 'canvas-confetti';
 
 interface AutomationBankViewProps {
@@ -155,6 +161,8 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
   const [activeChapterCategoryTab, setActiveChapterCategoryTab] = useState<
     'section' | 'lecture' | 'comprehensive_partial' | 'my_quizzes'
   >('section');
+  // Quick Personal Filter Sub-Tab inside Subject: 'none' | 'mistakes' | 'saved' | 'notes' (NO مكررة or معدلة)
+  const [subjectQuickTab, setSubjectQuickTab] = useState<SubjectQuickFilterTab>('none');
   const [chapterListSearch, setChapterListSearch] = useState('');
   const [chapterStatusFilter, setChapterStatusFilter] = useState<'all' | 'in_progress' | 'completed' | 'not_started'>('all');
 
@@ -424,27 +432,6 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
           }}
         />
 
-        {/* Floating Context-Aware Gemini Medical Chatbot Trigger (Bottom-Left) */}
-        <button
-          type="button"
-          onClick={() => setIsGeminiContextChatOpen(true)}
-          className="fixed left-3 bottom-4 z-40 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white shadow-xl shadow-violet-950/60 border border-violet-400/40 flex items-center gap-2 transition-all cursor-pointer group"
-          title="محادثة Gemini الذكية الواعية بالسياق (High Thinking)"
-          aria-label="فتح مساعد Gemini الطبي السياقي"
-        >
-          <div className="w-7 h-7 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
-            <Brain className="w-4 h-4 text-pink-200 group-hover:scale-110 transition-transform" />
-          </div>
-          <div className="text-right">
-            <span className="block text-[11px] font-black leading-tight">
-              مساعد Gemini الذكي
-            </span>
-            <span className="block text-[9px] text-violet-200 font-bold leading-tight">
-              تفكير عميق · واعي بالسياق
-            </span>
-          </div>
-        </button>
-
         <GeminiContextChatModal
           isOpen={isGeminiContextChatOpen}
           onClose={() => setIsGeminiContextChatOpen(false)}
@@ -524,6 +511,48 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
             (selectedChapterId && selectedChapterId !== '__custom_quiz__' ? selectedChapterId : null)
           }
         />
+
+        {/* Note Dialog Modal (shared across all levels) */}
+        {activeNoteModalQId && (
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-[#131D2E] border border-slate-800 rounded-3xl p-5 w-full max-w-md space-y-4 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2 text-indigo-400 text-sm font-bold">
+                  <FileText className="w-4 h-4" />
+                  <span>تسجيل ملاحظة على السؤال</span>
+                </div>
+                <button type="button" onClick={() => setActiveNoteModalQId(null)} className="text-slate-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <textarea
+                rows={4}
+                value={currentNoteText}
+                onChange={(e) => setCurrentNoteText(e.target.value)}
+                placeholder="اكتب ملاحظتك الخاصة على هذا السؤال..."
+                className="w-full p-3 bg-slate-900 border border-slate-700 rounded-2xl text-xs sm:text-sm font-medium text-white focus:outline-hidden text-right leading-relaxed"
+              />
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveNoteModalQId(null)}
+                  className="px-3 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveNoteSubmit}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl cursor-pointer"
+                >
+                  حفظ الملاحظة
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </>
     );
   };
@@ -2295,169 +2324,184 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
         return bPinned - aPinned;
       });
 
+    const subjectProgressPct =
+      subjectStats.totalQuestions > 0
+        ? Math.round((subjectStats.solvedCount / subjectStats.totalQuestions) * 100)
+        : 0;
+
+    const subjectQuickQuestions = getSubjectQuickTabQuestions(
+      subjectQuestionsAll,
+      subjectQuickTab,
+      wrongQuestionIds,
+      savedQuestionIds,
+      questionNotes
+    );
+
+    const subjectMistakesCount = subjectQuestionsAll.filter(q => wrongQuestionIds.includes(q.id)).length;
+    const subjectSavedCount = subjectQuestionsAll.filter(q => savedQuestionIds.includes(q.id)).length;
+    const subjectNotesCount = subjectQuestionsAll.filter(q => Boolean(questionNotes[q.id]?.trim())).length;
+
+    const isSubjectSavedOffline =
+      Boolean(offlineAutoStatus.allPack) ||
+      Boolean(offlineAutoStatus.bySubjectId?.[activeSubject.id]);
+
     return (
       <div className="w-full max-w-md mx-auto sm:max-w-2xl lg:max-w-3xl px-3.5 py-3.5 space-y-3.5 overflow-x-hidden">
-        {/* Header Breadcrumb */}
-        <div className="space-y-2 pb-2.5 border-b border-slate-800">
+        {/* Emerald Gradient Header Card (Matching PDF Pages 8 & 9) */}
+        <div className="bg-gradient-to-l from-emerald-500 via-emerald-600 to-teal-700 text-white rounded-3xl p-4 sm:p-5 shadow-lg space-y-3.5 dark-surface-preserve">
           <div className="flex items-center justify-between gap-2">
+            {/* Right side (RTL): Circular Back Button + Subject Title */}
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedSubjectId(null);
+                  setSubjectSubTab('chapters');
+                  setSubjectQuickTab('none');
+                }}
+                aria-label="العودة للمواد"
+                title="العودة للمواد"
+                className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 flex items-center justify-center text-white transition-all cursor-pointer shrink-0"
+              >
+                <ArrowRight className="w-5 h-5" />
+              </button>
+              <div className="min-w-0 flex-1 text-right">
+                <h2 className="text-base sm:text-xl font-black text-white truncate">
+                  {activeSubject.name}
+                </h2>
+                <p className="text-[11px] sm:text-xs text-emerald-50/90 font-semibold truncate">
+                  بنك الأتمتة
+                </p>
+              </div>
+            </div>
+
+            {/* Left side (RTL): Circular Action Buttons (Stats, Reset, Offline Download) */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleDownloadAutomationOffline('subject', activeSubject.id)}
+                title={
+                  isSubjectSavedOffline
+                    ? 'أتمتة المادة محفوظة أوفلاين ✓'
+                    : `تنزيل أتمتة المادة أوفلاين (${subjectQuestionsAll.length} سؤال)`
+                }
+                aria-label="تنزيل أتمتة المادة أوفلاين"
+                className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
+                  isSubjectSavedOffline
+                    ? 'bg-white text-emerald-700 border-white shadow-sm'
+                    : 'bg-white/15 hover:bg-white/25 border-white/20 text-white'
+                }`}
+              >
+                {isSubjectSavedOffline ? (
+                  <CheckCircle2 className="w-4 h-4" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setSubjectSubTab(prev => (prev === 'subject_stats' ? 'chapters' : 'subject_stats'))
+                }
+                title="إحصائيات المادة"
+                aria-label="إحصائيات المادة"
+                className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
+                  subjectSubTab === 'subject_stats'
+                    ? 'bg-white text-emerald-700 border-white shadow-sm'
+                    : 'bg-white/15 hover:bg-white/25 border-white/20 text-white'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                disabled={subjectStats.solvedCount === 0}
+                onClick={() =>
+                  openConfirmDialog({
+                    title: `تصفير إحصائيات مادة ${activeSubject.name}`,
+                    message: 'هل تريد إعادة ضبط جميع إجاباتك في هذه المادة والبدء من جديد؟',
+                    itemName: activeSubject.name,
+                    confirmLabel: 'نعم، تصفير المادة',
+                    onConfirm: () => resetQuestionsBatch(subjectQuestionsAll.map(q => q.id)),
+                  })
+                }
+                title="تصفير إجابات المادة"
+                aria-label="تصفير إجابات المادة"
+                className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 disabled:opacity-40 border border-white/20 flex items-center justify-center text-white transition-all cursor-pointer"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Progress Bar Row inside Emerald Header Card */}
+          <div className="space-y-1.5 pt-1">
+            <div className="w-full h-2 rounded-full bg-black/25 overflow-hidden">
+              <div
+                className="h-full bg-white rounded-full transition-all duration-300"
+                style={{ width: `${subjectProgressPct}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[11px] font-bold text-emerald-50 tabular-nums">
+              <span>تم إنجاز {subjectProgressPct}%</span>
+              <span>
+                {subjectStats.solvedCount} / {subjectStats.totalQuestions} سؤال
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Admin Toolbar & Offline Notice */}
+        {isAdmin && (
+          <div className="flex items-center justify-end gap-1.5 flex-wrap">
             <button
               type="button"
               onClick={() => {
-                setSelectedSubjectId(null);
-                setSubjectSubTab('chapters');
+                setBulkImportSubjectId(activeSubject.id);
+                setBulkImportChapterId(activeSubject.chapters?.[0]?.id || null);
+                setIsBulkImportModalOpen(true);
               }}
-              className="px-2.5 py-1.5 rounded-xl bg-[#131D2E] border border-slate-800 text-slate-300 hover:text-white flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer shrink-0"
+              className="px-2.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+              title="استيراد دفعي ذكي بالرموز (/q)"
             >
-              <ChevronRight className="w-4 h-4" />
-              <span>المواد</span>
+              <FileCode2 className="w-3.5 h-3.5" />
+              <span>استيراد دفعي (/q)</span>
             </button>
-
-            <div className="flex items-center gap-2 text-right flex-1 px-1 justify-end min-w-0">
-              <div className="min-w-0 flex-1">
-                <h2 className="text-sm sm:text-lg font-black text-white line-clamp-1">
-                  {activeSubject.name}
-                </h2>
-                <span className="text-[11px] text-slate-400 block truncate">{activeSubject.department}</span>
-              </div>
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border border-white/5"
-                style={{
-                  backgroundColor: `${resolveSubjectMedicalIcon(activeSubject).accentColor}20`,
-                  color: resolveSubjectMedicalIcon(activeSubject).accentColor,
-                }}
-              >
-                <SubjectMedicalIcon subject={activeSubject} className="w-5 h-5" />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 shrink-0">
-              <StatCircleButton
-                stats={subjectStats}
-                title={`إحصائيات مادة ${activeSubject.name}`}
-                onClick={() =>
-                  setStatsModalConfig({
-                    isOpen: true,
-                    title: `إحصائيات مادة ${activeSubject.name}`,
-                    subtitle: `${chaptersList.length} أقسام ومحاضرات`,
-                    stats: subjectStats,
-                    questionIds: subjectQuestionsAll.map(q => q.id),
-                  })
-                }
-              />
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setModalTargetSubjectId(activeSubject.id);
+                setQuestionToEdit(null);
+                setIsQuestionModalOpen(true);
+              }}
+              className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>سؤال جديد</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsAddingChapter(true)}
+              className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>إضافة قسم</span>
+            </button>
           </div>
+        )}
 
-          {/* Per-Subject Offline Automation Download Row + Admin Actions */}
-          <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
-            {(() => {
-              const isSubjectSavedOffline =
-                Boolean(offlineAutoStatus.allPack) ||
-                Boolean(offlineAutoStatus.bySubjectId?.[activeSubject.id]);
-              return (
-                <button
-                  type="button"
-                  onClick={() => handleDownloadAutomationOffline('subject', activeSubject.id)}
-                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                    isSubjectSavedOffline
-                      ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-300'
-                      : 'bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300'
-                  }`}
-                  title="تنزيل وحفظ جميع أقسام وأسئلة هذه المادة للعمل بدون إنترنت"
-                >
-                  {isSubjectSavedOffline ? (
-                    <>
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>أتمتة المادة محفوظة أوفلاين ✓</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-3.5 h-3.5 text-sky-400" />
-                      <span>تنزيل أتمتة المادة أوفلاين ({subjectQuestionsAll.length} سؤال)</span>
-                    </>
-                  )}
-                </button>
-              );
-            })()}
-
-            {isAdmin && (
-              <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBulkImportSubjectId(activeSubject.id);
-                    setBulkImportChapterId(activeSubject.chapters?.[0]?.id || null);
-                    setIsBulkImportModalOpen(true);
-                  }}
-                  className="px-2.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
-                  title="استيراد دفعي ذكي بالرموز (/q)"
-                >
-                  <FileCode2 className="w-3.5 h-3.5" />
-                  <span>استيراد دفعي (/q)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModalTargetSubjectId(activeSubject.id);
-                    setQuestionToEdit(null);
-                    setIsQuestionModalOpen(true);
-                  }}
-                  className="px-2.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>سؤال جديد</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsAddingChapter(true)}
-                  className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>إضافة قسم</span>
-                </button>
-              </div>
-            )}
+        {offlineAutoNotice && (
+          <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-end gap-2">
+            <span>{offlineAutoNotice}</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           </div>
-
-          {offlineAutoNotice && (
-            <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-end gap-2">
-              <span>{offlineAutoNotice}</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            </div>
-          )}
-        </div>
-
-        {/* Sub-Tabs Inside Subject: 1. أقسام ومحاضرات المادة | 2. إحصائيات المادة */}
-        <div className="grid grid-cols-2 gap-2 p-1 bg-[#131D2E] rounded-2xl border border-slate-800 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => setSubjectSubTab('chapters')}
-            className={`py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-              subjectSubTab === 'chapters'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            <span>أقسام ومحاضرات المادة</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSubjectSubTab('subject_stats')}
-            className={`py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-              subjectSubTab === 'subject_stats'
-                ? 'bg-sky-600 text-white shadow-xs'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <BarChart3 className="w-4 h-4" />
-            <span>إحصائيات المادة</span>
-          </button>
-        </div>
+        )}
 
         {/* Add Chapter Form (Admin) */}
         {isAddingChapter && (
-          <form onSubmit={handleCreateChapter} className="p-4 bg-[#131D2E] rounded-2xl border border-emerald-500/40 space-y-3 text-right">
+          <form onSubmit={handleCreateChapter} className="p-4 bg-[#161F30] rounded-2xl border border-emerald-500/40 space-y-3 text-right">
             <div className="flex items-center justify-between text-xs font-bold text-emerald-400">
               <span>إضافة قسم / محاضرة جديدة للمقرر</span>
               <button type="button" onClick={() => setIsAddingChapter(false)}>
@@ -2498,84 +2542,169 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
         )}
 
         {subjectSubTab === 'chapters' ? (
-          <div className="space-y-4">
-            {/* Feature 1: Continue Last Visited Chapter Banner (if exists) */}
-            {lastVisitedChapter && lastVisitedStats && (
-              <div
-                onClick={() => handleOpenChapter(lastVisitedChapter)}
-                className="p-3 rounded-2xl bg-[#131D2E] border border-emerald-500/40 hover:border-emerald-500 flex items-center justify-between gap-2.5 cursor-pointer transition-all shadow-xs"
-              >
-                <div className="flex items-center gap-2 shrink-0">
-                  <StatCircleButton
-                    size="sm"
-                    stats={lastVisitedStats}
-                    title={`إحصائيات ${lastVisitedChapter.name}`}
-                    onClick={() =>
-                      setStatsModalConfig({
-                        isOpen: true,
-                        title: lastVisitedChapter.name,
-                        subtitle: activeSubject.name,
-                        stats: lastVisitedStats,
-                        questionIds: questions
-                          .filter(
-                            q =>
-                              q.subjectId === activeSubject.id &&
-                              (q.chapterId === lastVisitedChapter.id || q.chapterName === lastVisitedChapter.name)
-                          )
-                          .map(q => q.id),
-                        onStartSolving: () => handleOpenChapter(lastVisitedChapter),
-                      })
-                    }
-                  />
-                  <span className="px-2.5 py-1.5 rounded-xl bg-emerald-600 text-white text-[11px] font-bold flex items-center gap-1 whitespace-nowrap">
-                    <span>متابعة فورية</span>
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-
-                <div className="text-right flex-1 min-w-0">
-                  <span className="text-[10px] font-bold text-emerald-400 block">
-                    آخر قسم كنت تدرسه:
-                  </span>
-                  <span className="font-bold text-xs sm:text-sm text-white truncate block">
-                    {lastVisitedChapter.name}
-                  </span>
-                </div>
+          <div className="space-y-3.5">
+            {/* Unified Control Card (Matching PDF Pages 8 & 9) */}
+            <div className="bg-[#161F30] border border-slate-800/80 rounded-3xl p-3 sm:p-3.5 space-y-2.5 shadow-md">
+              {/* Row 1: Search Bar */}
+              <div className="relative">
+                <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={chapterListSearch}
+                  onChange={(e) => setChapterListSearch(e.target.value)}
+                  placeholder="بحث متقدم في الأسئلة..."
+                  className="w-full pr-10 pl-8 py-2.5 bg-[#0E1625] border border-slate-800 focus:border-emerald-500 rounded-2xl text-xs sm:text-sm font-semibold text-white placeholder:text-slate-400 focus:outline-hidden text-right"
+                />
+                {chapterListSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setChapterListSearch('')}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
-            )}
 
-            {/* Feature 2: Top Category Tabs inside Subject (4 تبويبات: الأقسام | المحاضرات | شامل وجزئي | اختباراتي) */}
-            <div className="grid grid-cols-4 gap-1 sm:gap-1.5 p-1 bg-[#131D2E] rounded-2xl border border-slate-800 text-[10px] sm:text-xs font-bold tabular-nums">
-              {[
-                { id: 'section' as const, label: 'الأقسام', count: sectionChapters.length },
-                { id: 'lecture' as const, label: 'المحاضرات', count: lectureChapters.length },
-                { id: 'comprehensive_partial' as const, label: 'شامل وجزئي', count: compChapters.length },
-                {
-                  id: 'my_quizzes' as const,
-                  label: 'اختباراتي',
-                  count: studentCustomQuizzes.filter(q => q.subjectIds.includes(activeSubject.id)).length,
-                },
-              ].map((tab) => (
+              {/* Row 2: 4 Content Category Tabs (NO الدورات: الأقسام | المحاضرات | شامل وجزئي | اختباراتي) */}
+              <div className="grid grid-cols-4 gap-1.5 bg-[#0E1625] p-1 rounded-2xl border border-slate-800/80 text-[11px] sm:text-xs font-extrabold">
+                {[
+                  { id: 'section' as const, label: 'الأقسام' },
+                  { id: 'lecture' as const, label: 'المحاضرات' },
+                  { id: 'comprehensive_partial' as const, label: 'شامل وجزئي' },
+                  { id: 'my_quizzes' as const, label: 'اختباراتي' },
+                ].map((tab) => {
+                  const isActive = subjectQuickTab === 'none' && activeChapterCategoryTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveChapterCategoryTab(tab.id);
+                        setSubjectQuickTab('none');
+                      }}
+                      className={`py-2 px-1.5 rounded-xl text-center transition-all cursor-pointer truncate ${
+                        isActive
+                          ? 'bg-emerald-500 text-white shadow-md'
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Row 3: 3 Personal Quick Sub-Tabs (ONLY أخطائي | محفوظاتي | ملاحظاتي — NO مكررة or معدلة) */}
+              <div className="grid grid-cols-3 gap-2 pt-0.5 text-[11px] sm:text-xs font-bold">
                 <button
-                  key={tab.id}
                   type="button"
-                  onClick={() => setActiveChapterCategoryTab(tab.id)}
-                  className={`py-2 px-1 rounded-xl text-center transition-all cursor-pointer truncate ${
-                    activeChapterCategoryTab === tab.id
-                      ? tab.id === 'my_quizzes'
-                        ? 'bg-teal-600 text-white shadow-xs'
-                        : 'bg-emerald-600 text-white shadow-xs'
-                      : tab.id === 'my_quizzes'
-                      ? 'text-emerald-300 hover:text-white'
-                      : 'text-slate-400 hover:text-white'
+                  onClick={() =>
+                    setSubjectQuickTab(prev => (prev === 'mistakes' ? 'none' : 'mistakes'))
+                  }
+                  className={`py-2 px-2.5 rounded-2xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    subjectQuickTab === 'mistakes'
+                      ? 'bg-rose-500 border-rose-400 text-white shadow-md'
+                      : 'bg-[#0E1625] border-slate-800/80 text-slate-300 hover:text-white'
                   }`}
                 >
-                  {tab.label} ({tab.count})
+                  <X
+                    className={`w-3.5 h-3.5 ${
+                      subjectQuickTab === 'mistakes' ? 'text-white' : 'text-rose-400'
+                    }`}
+                  />
+                  <span>أخطائي</span>
+                  {subjectMistakesCount > 0 && (
+                    <span className="text-[10px] opacity-90 tabular-nums">({subjectMistakesCount})</span>
+                  )}
                 </button>
-              ))}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSubjectQuickTab(prev => (prev === 'saved' ? 'none' : 'saved'))
+                  }
+                  className={`py-2 px-2.5 rounded-2xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    subjectQuickTab === 'saved'
+                      ? 'bg-rose-500 border-rose-400 text-white shadow-md'
+                      : 'bg-[#0E1625] border-slate-800/80 text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <Heart
+                    className={`w-3.5 h-3.5 ${
+                      subjectQuickTab === 'saved'
+                        ? 'fill-white text-white'
+                        : 'fill-rose-500 text-rose-500'
+                    }`}
+                  />
+                  <span>محفوظاتي</span>
+                  {subjectSavedCount > 0 && (
+                    <span className="text-[10px] opacity-90 tabular-nums">({subjectSavedCount})</span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSubjectQuickTab(prev => (prev === 'notes' ? 'none' : 'notes'))
+                  }
+                  className={`py-2 px-2.5 rounded-2xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    subjectQuickTab === 'notes'
+                      ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-md'
+                      : 'bg-[#0E1625] border-slate-800/80 text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <Edit3
+                    className={`w-3.5 h-3.5 ${
+                      subjectQuickTab === 'notes' ? 'text-slate-950' : 'text-amber-400'
+                    }`}
+                  />
+                  <span>ملاحظاتي</span>
+                  {subjectNotesCount > 0 && (
+                    <span className="text-[10px] opacity-90 tabular-nums">({subjectNotesCount})</span>
+                  )}
+                </button>
+              </div>
             </div>
 
-            {activeChapterCategoryTab === 'my_quizzes' ? (
+            {subjectQuickTab !== 'none' ? (
+              /* Quick Personal Sub-Tab Content (Matching PDF Page 9) */
+              subjectQuickQuestions.length === 0 ? (
+                <div className="bg-[#161F30] border border-slate-800/80 rounded-3xl p-10 text-center space-y-3 shadow-md">
+                  <div className="w-16 h-16 rounded-full bg-slate-800/80 border border-slate-700/70 flex items-center justify-center mx-auto">
+                    {subjectQuickTab === 'mistakes' ? (
+                      <div className="w-9 h-9 rounded-full bg-rose-500 flex items-center justify-center text-white shadow-md">
+                        <X className="w-5 h-5 stroke-[3]" />
+                      </div>
+                    ) : subjectQuickTab === 'saved' ? (
+                      <Heart className="w-8 h-8 fill-rose-500 text-rose-500" />
+                    ) : (
+                      <Edit3 className="w-8 h-8 text-amber-400" />
+                    )}
+                  </div>
+                  <h3 className="text-sm sm:text-base font-black text-white">
+                    {subjectQuickTab === 'mistakes'
+                      ? 'لا يوجد لديك أخطاء بعد'
+                      : subjectQuickTab === 'saved'
+                      ? 'لا يوجد لديك أسئلة محفوظة بعد'
+                      : 'لا يوجد لديك ملاحظات بعد'}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-semibold">
+                    ستظهر هنا أثناء حلك للأسئلة
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3.5">
+                  {subjectQuickQuestions.map((q, idx) =>
+                    renderInteractivePracticeCard(
+                      q,
+                      idx,
+                      subjectQuickTab === 'mistakes' ? 'mistakes' : 'saved'
+                    )
+                  )}
+                </div>
+              )
+            ) : activeChapterCategoryTab === 'my_quizzes' ? (
               /* Subject-Scoped Custom Random Quizzes ('اختباراتي' for this subject) */
               <MyQuizzesPanel
                 subject={activeSubject}
@@ -2595,57 +2724,9 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
               />
             ) : (
               <>
-                {/* Feature 3: Search & Completion Status Filter Bar */}
-                <div className="bg-[#131D2E] border border-slate-800 rounded-2xl p-2.5 space-y-2">
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={chapterListSearch}
-                      onChange={(e) => setChapterListSearch(e.target.value)}
-                      placeholder="ابحث عن اسم القسم أو المحاضرة..."
-                      className="w-full pr-8 pl-8 py-1.5 bg-slate-900/80 border border-slate-700/80 focus:border-emerald-500 rounded-xl text-xs text-white placeholder:text-slate-400 focus:outline-hidden text-right"
-                    />
-                    {chapterListSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setChapterListSearch('')}
-                        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between gap-1.5 flex-wrap text-[11px] font-bold">
-                    <span className="text-slate-400">الفلترة حسب الإنجاز:</span>
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {[
-                        { id: 'all' as const, label: 'الكل' },
-                        { id: 'in_progress' as const, label: 'قيد الدراسة' },
-                        { id: 'completed' as const, label: 'مكتمل' },
-                        { id: 'not_started' as const, label: 'لم يبدأ' },
-                      ].map((stTab) => (
-                        <button
-                          key={stTab.id}
-                          type="button"
-                          onClick={() => setChapterStatusFilter(stTab.id)}
-                          className={`px-2.5 py-1 rounded-lg transition-colors cursor-pointer ${
-                            chapterStatusFilter === stTab.id
-                              ? 'bg-sky-600 text-white'
-                              : 'bg-slate-800/80 text-slate-300 hover:text-white'
-                          }`}
-                        >
-                          {stTab.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Clean Organized Chapters List (All stats confined to StatCircleButton) */}
+                {/* Clean Organized Chapters List (Matching PDF Page 8) */}
                 {displayedChapters.length === 0 ? (
-                  <div className="text-center py-10 bg-[#131D2E] rounded-2xl border border-dashed border-slate-800 p-6 space-y-2">
+                  <div className="text-center py-10 bg-[#161F30] rounded-3xl border border-slate-800/80 p-6 space-y-2">
                     <Layers className="w-8 h-8 text-slate-500 mx-auto" />
                     <p className="text-xs font-bold text-white">لا توجد أقسام مطابقة للبحث أو التصنيف المحدد</p>
                     <button
@@ -2661,7 +2742,7 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
                     </button>
                   </div>
                 ) : (
-                  <div className={density.chaptersGrid}>
+                  <div className="space-y-2.5">
                     {displayedChapters.map((ch, idx) => renderChapterRow(ch, idx))}
                   </div>
                 )}
@@ -2951,100 +3032,17 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
     const chStats = computeQuestionStats(chQuestions, solvedQuestions);
     const isPinned = pinnedChapterIds.includes(ch.id);
 
-    const categoryLabel =
-      ch.category === 'lecture'
-        ? 'محاضرة'
-        : ch.category === 'comprehensive_partial'
-        ? 'شامل وجزئي'
-        : 'قسم المقرر';
-
     return (
       <div
         key={ch.id}
-        className={`${cardSurfaceClass} hover:bg-[#162238] border ${
-          isPinned ? 'border-amber-500/40' : ''
-        } rounded-2xl p-2.5 sm:p-3.5 transition-all flex items-center justify-between gap-2 min-w-0`}
+        className={`bg-[#161F30] hover:bg-[#1B263B] border ${
+          isPinned ? 'border-amber-500/40' : 'border-slate-800/80 hover:border-emerald-500/40'
+        } rounded-3xl p-3.5 sm:p-4 transition-all flex items-center justify-between gap-3 min-w-0 shadow-sm`}
       >
-        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          {isAdmin && (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setRenamingChapterId(ch.id);
-                  setRenamedChapterName(ch.name);
-                  setRenamedChapterCategory(ch.category || 'section');
-                }}
-                className="text-slate-400 hover:text-white p-1.5 rounded-lg bg-slate-800/60 cursor-pointer"
-                title="تعديل القسم"
-                aria-label={`تعديل القسم ${ch.name}`}
-              >
-                <Edit3 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  openConfirmDialog({
-                    title: 'حذف القسم وكافة أسئلته',
-                    message: 'هل أنت متأكد من حذف هذا القسم وجميع أسئلة الأتمتة المرتبطة به نهائياً؟',
-                    itemName: ch.name,
-                    onConfirm: () => deleteChapterFromSubject(activeSubject.id, ch.id),
-                  })
-                }
-                className="text-slate-400 hover:text-rose-400 p-1.5 rounded-lg bg-slate-800/60 cursor-pointer"
-                title="حذف القسم"
-                aria-label={`حذف القسم ${ch.name}`}
-              >
-                <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-              </button>
-            </div>
-          )}
-
-          {/* Pin Chapter to Top Button */}
-          <button
-            type="button"
-            onClick={(e) => togglePinChapter(ch.id, e)}
-            className={`w-8 h-8 rounded-xl border flex items-center justify-center transition-colors cursor-pointer ${
-              isPinned
-                ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
-                : 'bg-[#0E172A]/80 border-slate-700/80 text-slate-400 hover:text-white'
-            }`}
-            title={isPinned ? 'إلغاء تثبيت القسم من الأعلى' : 'تثبيت هذا القسم في أعلى القائمة'}
-            aria-label={isPinned ? 'إلغاء تثبيت القسم' : 'تثبيت القسم'}
-          >
-            <Pin className={`w-3 h-3 ${isPinned ? 'fill-amber-400' : ''}`} />
-          </button>
-
-          {/* Interactive Circular Statistical Icon beside every section/chapter */}
-          <StatCircleButton
-            size="sm"
-            stats={chStats}
-            title={`إحصائيات ${ch.name}`}
-            onClick={() =>
-              setStatsModalConfig({
-                isOpen: true,
-                title: ch.name,
-                subtitle: activeSubject.name,
-                stats: chStats,
-                questionIds: chQuestions.map(q => q.id),
-                onStartSolving: () => handleOpenChapter(ch),
-              })
-            }
-          />
-
-          <button
-            type="button"
-            onClick={() => handleOpenChapter(ch)}
-            className="flex items-center gap-0.5 px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold cursor-pointer shadow-xs whitespace-nowrap"
-          >
-            <span>{chStats.solvedCount > 0 ? 'متابعة' : 'بدء'}</span>
-            <ChevronLeft className="w-3 h-3" />
-          </button>
-        </div>
-
-        <div className="text-right flex-1 min-w-0 pr-0.5">
+        {/* Right side (RTL first child): Numbered Emerald Square + Chapter Title & Question Count */}
+        <div className="flex-1 min-w-0 text-right">
           {renamingChapterId === ch.id ? (
-            <div className="flex flex-wrap items-center justify-end gap-1.5">
+            <div className="flex flex-wrap items-center justify-start gap-1.5">
               <input
                 type="text"
                 value={renamedChapterName}
@@ -3082,28 +3080,90 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
           ) : (
             <div
               onClick={() => handleOpenChapter(ch)}
-              className="flex items-center justify-end gap-2 cursor-pointer min-w-0"
+              className="flex items-center gap-3 cursor-pointer min-w-0"
             >
-              <div className="space-y-0.5 min-w-0 flex-1">
-                <h4 className="font-bold text-xs sm:text-sm text-white hover:text-emerald-400 transition-colors leading-snug line-clamp-2 break-words">
+              <span className="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-sm sm:text-base font-black text-emerald-400 tabular-nums shrink-0">
+                {index + 1}
+              </span>
+
+              <div className="space-y-1 min-w-0 flex-1">
+                <h4 className="font-extrabold text-xs sm:text-sm text-white hover:text-emerald-400 transition-colors leading-snug line-clamp-2 break-words">
                   {ch.name}
                 </h4>
-                <div className="flex items-center justify-end gap-1 text-[10px] text-slate-400">
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-semibold">
+                  <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>{chQuestions.length} سؤال متاح</span>
                   {isPinned && (
-                    <>
-                      <span className="text-amber-400 font-bold">مثبت</span>
-                      <span aria-hidden="true">·</span>
-                    </>
+                    <span className="text-amber-400 font-bold mr-1">· مثبت</span>
                   )}
-                  <span>{categoryLabel}</span>
                 </div>
               </div>
-
-              <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-slate-800/80 border border-slate-700/70 flex items-center justify-center text-[10px] sm:text-[11px] font-black text-emerald-400 tabular-nums shrink-0">
-                {String(index + 1).padStart(2, '0')}
-              </span>
             </div>
           )}
+        </div>
+
+        {/* Left side (RTL second child): Circular Play Button + Stat Circle + Admin/Pin controls */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {isAdmin && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setRenamingChapterId(ch.id);
+                  setRenamedChapterName(ch.name);
+                  setRenamedChapterCategory(ch.category || 'section');
+                }}
+                className="text-slate-400 hover:text-white p-1.5 rounded-lg bg-slate-800/60 cursor-pointer"
+                title="تعديل القسم"
+                aria-label={`تعديل القسم ${ch.name}`}
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  openConfirmDialog({
+                    title: 'حذف القسم وكافة أسئلته',
+                    message: 'هل أنت متأكد من حذف هذا القسم وجميع أسئلة الأتمتة المرتبطة به نهائياً؟',
+                    itemName: ch.name,
+                    onConfirm: () => deleteChapterFromSubject(activeSubject.id, ch.id),
+                  })
+                }
+                className="text-slate-400 hover:text-rose-400 p-1.5 rounded-lg bg-slate-800/60 cursor-pointer"
+                title="حذف القسم"
+                aria-label={`حذف القسم ${ch.name}`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* Interactive Circular Statistical Icon beside every section/chapter */}
+          <StatCircleButton
+            size="sm"
+            stats={chStats}
+            title={`إحصائيات ${ch.name}`}
+            onClick={() =>
+              setStatsModalConfig({
+                isOpen: true,
+                title: ch.name,
+                subtitle: activeSubject.name,
+                stats: chStats,
+                questionIds: chQuestions.map(q => q.id),
+                onStartSolving: () => handleOpenChapter(ch),
+              })
+            }
+          />
+
+          <button
+            type="button"
+            onClick={() => handleOpenChapter(ch)}
+            aria-label={`بدء حل ${ch.name}`}
+            title={chStats.solvedCount > 0 ? 'متابعة الحل' : 'بدء الحل'}
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center cursor-pointer shadow-md shadow-emerald-950/50 transition-transform active:scale-95 shrink-0"
+          >
+            <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
+          </button>
         </div>
       </div>
     );
@@ -3114,82 +3174,62 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
   // ==========================================
   return (
     <div className="w-full max-w-md mx-auto sm:max-w-2xl lg:max-w-3xl px-3.5 py-3.5 space-y-4 overflow-x-hidden">
-      {/* Top Header (Click MedFur in top header to return Home) */}
-      <div className="space-y-2 pb-2 border-b border-slate-800">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h1 className="text-base sm:text-xl font-black text-emerald-400 text-right">
-            بنك الأتمتة الأكاديمي
-          </h1>
+      {/* Emerald Gradient Header Card for Automation Bank Hub */}
+      <div className="bg-gradient-to-l from-emerald-500 via-emerald-600 to-teal-700 text-white rounded-3xl p-4 sm:p-5 shadow-lg space-y-3.5 dark-surface-preserve">
+        <div className="flex items-center justify-between gap-2">
+          {/* Right side: Back Button to Home + Title */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={() => setActiveSection('home')}
+              aria-label="العودة للرئيسية"
+              title="العودة للرئيسية"
+              className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 flex items-center justify-center text-white transition-all cursor-pointer shrink-0"
+            >
+              <ArrowRight className="w-5 h-5" />
+            </button>
+            <div className="min-w-0 flex-1 text-right">
+              <h1 className="text-base sm:text-xl font-black text-white truncate">
+                بنك الأتمتة الأكاديمي
+              </h1>
+              <p className="text-[11px] sm:text-xs text-emerald-50/90 font-semibold truncate">
+                اختر المادة للبدء بحل الأسئلة والأتمتة التفاعلية
+              </p>
+            </div>
+          </div>
 
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {/* Global Download All Automation Offline Button */}
+          {/* Left side: Offline Download + Eye Comfort / Theme */}
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={() => handleDownloadAutomationOffline('all')}
-              className={`px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3 py-2 rounded-2xl text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
                 offlineAutoStatus.allPack
-                  ? 'bg-emerald-500/15 border border-emerald-500/40 text-emerald-300'
-                  : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm'
+                  ? 'bg-white text-emerald-700 border-white shadow-sm'
+                  : 'bg-white/15 hover:bg-white/25 border-white/25 text-white'
               }`}
               title="تنزيل وحفظ جميع أسئلة ومواد بنك الأتمتة للعمل بدون إنترنت"
             >
               {offlineAutoStatus.allPack ? (
                 <>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>كل الأتمتة محفوظة أوفلاين ({offlineAutoStatus.allPack.questionsCount})</span>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>محفوظ أوفلاين ✓</span>
                 </>
               ) : (
                 <>
                   <Download className="w-3.5 h-3.5" />
-                  <span>تنزيل كل الأتمتة أوفلاين</span>
+                  <span>تنزيل الأتمتة</span>
                 </>
               )}
-            </button>
-
-            <div
-              className="flex items-center gap-1 px-2 py-1.5 rounded-xl bg-[#131D2E] border border-slate-800"
-              title="تغيير لون التطبيق الحيوي"
-            >
-              <Palette className="w-3.5 h-3.5 text-emerald-400" />
-              {(
-                [
-                  { id: 'emerald', bg: 'bg-emerald-500', label: 'أخضر زمردي' },
-                  { id: 'sky', bg: 'bg-sky-500', label: 'أزرق سماوي' },
-                  { id: 'orange', bg: 'bg-orange-500', label: 'برتقالي حيوي' },
-                  { id: 'purple', bg: 'bg-purple-500', label: 'بنفسجي' },
-                  { id: 'rose', bg: 'bg-rose-500', label: 'وردي مرجاني' },
-                ] as const
-              ).map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setColorTheme(t.id)}
-                  title={t.label}
-                  aria-label={t.label}
-                  className={`w-3.5 h-3.5 rounded-full ${t.bg} transition-transform cursor-pointer ${
-                    colorTheme === t.id ? 'scale-125 ring-2 ring-white' : 'opacity-70 hover:opacity-100'
-                  }`}
-                />
-              ))}
-            </div>
-
-            <button
-              type="button"
-              onClick={toggleDarkMode}
-              className="p-2 rounded-xl border bg-[#131D2E] border-slate-800 text-slate-300 hover:text-white cursor-pointer transition-colors"
-              title={darkMode ? 'التبديل إلى الوضع النهاري' : 'التبديل إلى الوضع الليلي'}
-              aria-label="تبديل الوضع الليلي والنهاري"
-            >
-              {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-sky-600" />}
             </button>
 
             <button
               type="button"
               onClick={toggleEyeComfortMode}
-              className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors ${
+              className={`w-9 h-9 rounded-full border flex items-center justify-center cursor-pointer transition-colors ${
                 eyeComfortMode
-                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
-                  : 'bg-[#131D2E] border-slate-800 text-slate-400 hover:text-white'
+                  ? 'bg-amber-400 text-slate-950 border-amber-300'
+                  : 'bg-white/15 hover:bg-white/25 border-white/20 text-white'
               }`}
               title="وضع القراءة المريح للعين"
               aria-label="وضع القراءة المريح للعين"
@@ -3199,13 +3239,26 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
           </div>
         </div>
 
-        {offlineAutoNotice && (
-          <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-end gap-2">
-            <span>{offlineAutoNotice}</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          </div>
-        )}
+        {/* Stat Pills Row */}
+        <div className="flex items-center gap-2 flex-wrap pt-0.5 text-[11px] font-bold">
+          <span className="px-3 py-1 rounded-full bg-black/20 border border-white/10">
+            {subjects.length} مادة
+          </span>
+          <span className="px-3 py-1 rounded-full bg-black/20 border border-white/10">
+            {questions.length} سؤال أتمتة
+          </span>
+          <span className="px-3 py-1 rounded-full bg-black/20 border border-white/10">
+            تم حل {globalStats.solvedCount} سؤال
+          </span>
+        </div>
       </div>
+
+      {offlineAutoNotice && (
+        <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-end gap-2">
+          <span>{offlineAutoNotice}</span>
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+        </div>
+      )}
 
       {/* Main View Tabs */}
       <div className={`grid ${isAdmin ? 'grid-cols-5' : 'grid-cols-4'} gap-1 sm:gap-1.5 p-1 bg-[#131D2E] rounded-2xl border border-slate-800 text-[10px] sm:text-xs font-bold min-w-0`}>
@@ -3276,10 +3329,6 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
       {/* TAB 1: SUBJECTS CATALOG */}
       {activeTab === 'bank' && (
         <div className="space-y-4">
-          <p className="text-xs sm:text-sm text-slate-400 text-center">
-            اختر المادة للبدء بحل الأسئلة بنظام السرد الطولي، أو اضغط على الدائرة الإحصائية لعرض إحصائيات المادة.
-          </p>
-
           {/* In-App Expandable Year Selector */}
           <InAppSelect<AcademicYearId>
             ariaLabel="السنة الدراسية"
@@ -3755,50 +3804,8 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
         />
       )}
 
-      {/* Advanced Question Modals (Discussion, Report Question, AI Tutor) */}
+      {/* Advanced Question Modals (Discussion, Report Question, AI Tutor, Note Modal) */}
       {renderAdvancedQuestionModals()}
-
-      {/* Note Dialog Modal (when triggered from Mistakes/Saved tabs) */}
-      {activeNoteModalQId && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-[#131D2E] border border-slate-800 rounded-3xl p-5 w-full max-w-md space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <div className="flex items-center gap-2 text-indigo-400 text-sm font-bold">
-                <FileText className="w-4 h-4" />
-                <span>تسجيل ملاحظة على السؤال</span>
-              </div>
-              <button type="button" onClick={() => setActiveNoteModalQId(null)} className="text-slate-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <textarea
-              rows={4}
-              value={currentNoteText}
-              onChange={(e) => setCurrentNoteText(e.target.value)}
-              placeholder="اكتب ملاحظتك الخاصة على هذا السؤال..."
-              className="w-full p-3 bg-slate-900 border border-slate-700 rounded-2xl text-xs sm:text-sm font-medium text-white focus:outline-hidden text-right leading-relaxed"
-            />
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setActiveNoteModalQId(null)}
-                className="px-3 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl cursor-pointer"
-              >
-                إلغاء
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveNoteSubmit}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl cursor-pointer"
-              >
-                حفظ الملاحظة
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Subject Modal */}
       <SubjectModal

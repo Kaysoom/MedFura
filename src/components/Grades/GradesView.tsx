@@ -48,7 +48,8 @@ export const GradesView: React.FC = () => {
     adminUpdateStudentGrades,
     addSubject,
     updateSubject,
-    deleteSubject
+    deleteSubject,
+    setActiveSection,
   } = useApp();
 
   // Main Tabs: 1. علاماتي | 2. ترتيبي على الدفعة
@@ -447,19 +448,26 @@ export const GradesView: React.FC = () => {
         </div>
       )}
 
-      {/* Compact Header Banner */}
-      <div className="bg-gradient-to-r from-indigo-700 via-sky-700 to-indigo-900 text-white p-4 sm:p-6 rounded-2xl shadow-lg space-y-3">
-        <div className="space-y-1.5">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/15 text-[11px] font-bold text-sky-100">
-            <Award className="w-3.5 h-3.5" />
-            <span>نظام العلامات والترتيب المئوي الأكاديمي</span>
+      {/* Emerald Header Banner with Back Button */}
+      <div className="bg-gradient-to-l from-emerald-500 via-emerald-600 to-teal-700 text-white p-4 sm:p-5 rounded-3xl shadow-lg space-y-3 dark-surface-preserve">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveSection('home')}
+            aria-label="العودة للرئيسية"
+            title="العودة للرئيسية"
+            className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 flex items-center justify-center text-white transition-all cursor-pointer shrink-0"
+          >
+            <ArrowRight className="w-5 h-5" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-base sm:text-xl font-black leading-snug truncate">
+              كشف الدرجات والترتيب العام على الدفعة
+            </h1>
+            <p className="text-[11px] sm:text-xs text-emerald-50/90 font-semibold truncate">
+              نظام العلامات المئوي والترتيب العام لطلاب كلية الطب البشري
+            </p>
           </div>
-          <h1 className="text-base sm:text-2xl font-black leading-snug">
-            كشف الدرجات والترتيب العام على الدفعة
-          </h1>
-          <p className="text-[11px] sm:text-xs text-sky-100 max-w-xl leading-relaxed">
-            نظام مئوي دقيق (/100) مع جدول إدخال التحضيرية ونظام الترتيب المزدوج (مع وبدون تحضيري).
-          </p>
         </div>
 
         {/* Supervisor Actions */}

@@ -18,6 +18,7 @@ import {
   InAppMediaViewerModal,
   InAppViewerItem,
 } from './components/Common/InAppMediaViewerModal';
+import { shouldShowGlobalHeader } from './utils/redesignStructureLogic';
 import { Bell, FolderArchive, Building, X } from 'lucide-react';
 
 const AppContent: React.FC = () => {
@@ -184,8 +185,8 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      {/* Top Header with Global Search, Vibrant Theme Picker, Notifications & Drawer Menu */}
-      <Header />
+      {/* Top Header shown ONLY on Home Dashboard (Sub-sections use their full-bleed Emerald Header Card) */}
+      {shouldShowGlobalHeader(activeSection) && <Header />}
 
       {/* Live Local Notification Toast Banner when a new Library file or Announcement is added */}
       {activeToastNotification && (
@@ -241,7 +242,7 @@ const AppContent: React.FC = () => {
       )}
 
       {/* Main View Area */}
-      <main className={`flex-1 w-full max-w-full min-w-0 flex flex-col ${activeSection === 'discussions' ? 'h-[calc(100dvh-50px)] overflow-hidden' : 'pb-16'}`}>
+      <main className={`flex-1 w-full max-w-full min-w-0 flex flex-col ${activeSection === 'discussions' ? 'h-dvh overflow-hidden' : 'pb-16'}`}>
         {activeSection === 'home' && <HomeDashboard />}
         {activeSection === 'automation' && <AutomationBankView />}
         {activeSection === 'library' && <LibraryView />}

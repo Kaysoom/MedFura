@@ -17,6 +17,7 @@ html:not(.dark):not(.eye-comfort) body {
   color: #0f172a;
 }
 
+html:not(.dark):not(.eye-comfort) .bg-\[\#0B111E\],
 html:not(.dark):not(.eye-comfort) .bg-\[\#0B132B\]\/90,
 html:not(.dark):not(.eye-comfort) .bg-\[\#0E172A\],
 html:not(.dark):not(.eye-comfort) .bg-\[\#0F172A\],
@@ -27,12 +28,15 @@ html:not(.dark):not(.eye-comfort) .bg-\[\#111A2E\]\/95,
 html:not(.dark):not(.eye-comfort) .bg-\[\#131D2E\],
 html:not(.dark):not(.eye-comfort) .bg-\[\#131D2E\]\/80,
 html:not(.dark):not(.eye-comfort) .bg-\[\#131D2E\]\/90,
-html:not(.dark):not(.eye-comfort) .bg-\[\#131D2E\]\/95 {
+html:not(.dark):not(.eye-comfort) .bg-\[\#131D2E\]\/95,
+html:not(.dark):not(.eye-comfort) .bg-\[\#161F30\],
+html:not(.dark):not(.eye-comfort) .bg-\[\#1B263B\] {
   background-color: #ffffff !important;
   border-color: #cbd5e1 !important;
   color: #0f172a !important;
 }
 
+html:not(.dark):not(.eye-comfort) .bg-\[\#0E1625\],
 html:not(.dark):not(.eye-comfort) .bg-\[\#0E1628\],
 html:not(.dark):not(.eye-comfort) .bg-\[\#121B2B\]\/60,
 html:not(.dark):not(.eye-comfort) .bg-\[\#152036\],

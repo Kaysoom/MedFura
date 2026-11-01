@@ -608,6 +608,15 @@ export const DiscussionsView: React.FC = () => {
           <div className="p-3.5 border-b border-slate-800/80 space-y-3 bg-[#111A2E]">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveSection('home')}
+                  aria-label="العودة للرئيسية"
+                  title="العودة للرئيسية"
+                  className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-center text-white transition-colors cursor-pointer shrink-0"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                </button>
                 <div className="relative">
                   <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white font-black text-sm flex items-center justify-center shadow-md">
                     {user?.displayName ? user.displayName.charAt(0) : 'ط'}
