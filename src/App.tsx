@@ -13,7 +13,6 @@ import { DiscussionsView } from './components/Discussions/DiscussionsView';
 import { SettingsView } from './components/Settings/SettingsView';
 import { DirectChatWidget } from './components/Chat/DirectChatWidget';
 import { PWAInstallPrompt } from './components/Common/PWAInstallPrompt';
-import { AppSplashScreen } from './components/Common/AppSplashScreen';
 import { DownloadManager } from './components/Common/DownloadManager';
 import {
   InAppMediaViewerModal,
@@ -175,9 +174,6 @@ const AppContent: React.FC = () => {
     <div
       className={`min-h-screen w-full max-w-[100vw] overflow-x-hidden flex flex-col transition-colors duration-200 selection:bg-emerald-500 selection:text-white ${rootThemeClass}`}
     >
-      {/* Opening Splash Screen featuring the Official MF Graduation Cap Logo */}
-      <AppSplashScreen />
-
       {/* Subtle Blue-Light Protection Filter Overlay when Eye Comfort Mode is active */}
       {eyeComfortMode && (
         <div
