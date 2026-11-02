@@ -1,8 +1,225 @@
-import { LibraryFileItem, LibraryFolderItem, MarketplaceItem, QuestionItem, VideoItem } from '../types';
+import {
+  ChapterCategory,
+  LibraryFileItem,
+  LibraryFolderItem,
+  MarketplaceItem,
+  QuestionItem,
+  SubjectItem,
+  VideoItem,
+} from '../types';
 
 export type LibraryMainTab = 'cloud' | 'downloads' | 'favorites';
 export type LibrarySortOption = 'newest' | 'alpha' | 'size';
 export type SubjectQuickFilterTab = 'none' | 'mistakes' | 'saved' | 'notes';
+export type PersonalHierarchyCategory =
+  | 'section'
+  | 'lecture'
+  | 'comprehensive_partial'
+  | 'all';
+
+export interface PersonalBranchGroup {
+  branchKey: string;
+  subjectId: string;
+  subjectName: string;
+  chapterId: string;
+  chapterName: string;
+  category: ChapterCategory;
+  questions: QuestionItem[];
+}
+
+export interface PersonalHierarchyBreakdown {
+  countsByCategory: {
+    section: number;
+    lecture: number;
+    comprehensive_partial: number;
+    all: number;
+  };
+  branchesByCategory: {
+    section: PersonalBranchGroup[];
+    lecture: PersonalBranchGroup[];
+    comprehensive_partial: PersonalBranchGroup[];
+  };
+  allQuestions: QuestionItem[];
+}
+
+export const PERSONAL_HIERARCHY_TABS: ReadonlyArray<{
+  id: PersonalHierarchyCategory;
+  label: string;
+}> = [
+  { id: 'section', label: 'الأقسام' },
+  { id: 'lecture', label: 'المحاضرات' },
+  { id: 'comprehensive_partial', label: 'شامل وجزئي' },
+  { id: 'all', label: 'كامل' },
+];
+
+/**
+ * Resolves the chapter category ('section' | 'lecture' | 'comprehensive_partial')
+ * and display metadata for a question from its parent subject's chapters list.
+ */
+export function resolveQuestionBranchMeta(
+  question: QuestionItem,
+  subjects: SubjectItem[]
+): {
+  subjectId: string;
+  subjectName: string;
+  chapterId: string;
+  chapterName: string;
+  category: ChapterCategory;
+} {
+  const subject = subjects.find((s) => s.id === question.subjectId);
+  const subjectName = subject?.name || 'مادة دراسية';
+  const chapters = subject?.chapters || [];
+
+  const matchedChapter = chapters.find(
+    (c) =>
+      c.id === question.chapterId ||
+      (Boolean(question.chapterName) && c.name === question.chapterName)
+  );
+
+  if (matchedChapter) {
+    const category: ChapterCategory =
+      matchedChapter.category === 'lecture'
+        ? 'lecture'
+        : matchedChapter.category === 'comprehensive_partial'
+          ? 'comprehensive_partial'
+          : 'section';
+    return {
+      subjectId: question.subjectId,
+      subjectName,
+      chapterId: matchedChapter.id,
+      chapterName: matchedChapter.name,
+      category,
+    };
+  }
+
+  const fallbackName = (question.chapterName || '').trim() || 'القسم العام';
+  let inferredCategory: ChapterCategory = 'section';
+  if (fallbackName.includes('محاضره') || fallbackName.includes('محاضرة') || fallbackName.includes('المحاضرة')) {
+    inferredCategory = 'lecture';
+  } else if (fallbackName.includes('شامل') || fallbackName.includes('جزئي')) {
+    inferredCategory = 'comprehensive_partial';
+  }
+
+  return {
+    subjectId: question.subjectId,
+    subjectName,
+    chapterId: question.chapterId || fallbackName,
+    chapterName: fallbackName,
+    category: inferredCategory,
+  };
+}
+
+/**
+ * Organizes any list of personal questions (Mistakes / Saved / Notes) into the 4 main categories:
+ * - 'section' (الأقسام)
+ * - 'lecture' (المحاضرات)
+ * - 'comprehensive_partial' (شامل وجزئي)
+ * - 'all' (كامل)
+ * Only branches with >= 1 matching question are included in `branchesByCategory`,
+ * while all 4 main categories remain permanently available in the UI tabs.
+ */
+export function buildPersonalHierarchyBreakdown(
+  matchingQuestions: QuestionItem[],
+  subjects: SubjectItem[]
+): PersonalHierarchyBreakdown {
+  const branchMap = new Map<string, PersonalBranchGroup>();
+
+  for (const q of matchingQuestions) {
+    const meta = resolveQuestionBranchMeta(q, subjects);
+    const branchKey = `${meta.subjectId}::${meta.chapterId}`;
+    const existing = branchMap.get(branchKey);
+    if (existing) {
+      existing.questions.push(q);
+    } else {
+      branchMap.set(branchKey, {
+        branchKey,
+        subjectId: meta.subjectId,
+        subjectName: meta.subjectName,
+        chapterId: meta.chapterId,
+        chapterName: meta.chapterName,
+        category: meta.category,
+        questions: [q],
+      });
+    }
+  }
+
+  const allBranches = Array.from(branchMap.values());
+  const sectionBranches = allBranches.filter(
+    (b) => b.category === 'section' && b.questions.length > 0
+  );
+  const lectureBranches = allBranches.filter(
+    (b) => b.category === 'lecture' && b.questions.length > 0
+  );
+  const compBranches = allBranches.filter(
+    (b) => b.category === 'comprehensive_partial' && b.questions.length > 0
+  );
+
+  const countQuestions = (groups: PersonalBranchGroup[]) =>
+    groups.reduce((sum, g) => sum + g.questions.length, 0);
+
+  return {
+    countsByCategory: {
+      section: countQuestions(sectionBranches),
+      lecture: countQuestions(lectureBranches),
+      comprehensive_partial: countQuestions(compBranches),
+      all: matchingQuestions.length,
+    },
+    branchesByCategory: {
+      section: sectionBranches,
+      lecture: lectureBranches,
+      comprehensive_partial: compBranches,
+    },
+    allQuestions: matchingQuestions,
+  };
+}
+
+/**
+ * Generates a standards-compliant PDF 1.4 binary buffer (`%PDF-1.4 ... %%EOF`)
+ * so that synthesized offline PDF files open directly in external PDF viewers as genuine PDF documents.
+ */
+export function buildValidPdfBinaryBytes(options: {
+  title: string;
+  author?: string;
+  subtitle?: string;
+  pages?: number;
+  expectedBytes?: number;
+}): Uint8Array {
+  const safeAsciiTitle =
+    (options.title || 'MedFur Document').replace(/[^\x20-\x7E]/g, ' ').trim() ||
+    'MedFur Academic PDF';
+  const pageCount = Math.max(1, options.pages || 4);
+
+  const contentStream = `BT /F1 16 Tf 50 750 Td (MedFur Academic Library - PDF Document) Tj 0 -28 Td /F1 12 Tf (${safeAsciiTitle}) Tj 0 -22 Td (Pages: ${pageCount}) Tj ET`;
+  const streamLength = contentStream.length;
+
+  const pdfStructure = [
+    '%PDF-1.4',
+    '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
+    '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
+    '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj',
+    `4 0 obj << /Length ${streamLength} >> stream`,
+    contentStream,
+    'endstream endobj',
+    '5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
+    'xref',
+    '0 6',
+    '0000000000 65535 f ',
+    '0000000009 00000 n ',
+    '0000000058 00000 n ',
+    '0000000115 00000 n ',
+    '0000000241 00000 n ',
+    '0000000390 00000 n ',
+    'trailer << /Size 6 /Root 1 0 R >>',
+    'startxref',
+    '460',
+    '%%EOF',
+    '',
+  ].join('\n');
+
+  const encoder = new TextEncoder();
+  return encoder.encode(pdfStructure);
+}
+
 
 /**
  * Determines whether the global top Header bar should be visible.

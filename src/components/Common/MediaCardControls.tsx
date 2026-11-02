@@ -130,6 +130,8 @@ interface MediaThreeDotsMenuProps {
   onShare: () => void;
   onSendTelegram: () => void;
   onOpenExternal?: () => void;
+  externalLabel?: string;
+  onOpenInApp?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
 }
@@ -150,6 +152,8 @@ export const MediaThreeDotsMenu: React.FC<MediaThreeDotsMenuProps> = ({
   onShare,
   onSendTelegram,
   onOpenExternal,
+  externalLabel,
+  onOpenInApp,
   onEdit,
   onDelete,
 }) => {
@@ -179,7 +183,7 @@ export const MediaThreeDotsMenu: React.FC<MediaThreeDotsMenuProps> = ({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-10 z-50 w-48 rounded-2xl bg-[#1A2436] border border-slate-700/90 shadow-2xl py-2 px-1.5 space-y-1 text-right animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute left-0 top-10 z-50 w-52 rounded-2xl bg-[#1A2436] border border-slate-700/90 shadow-2xl py-2 px-1.5 space-y-1 text-right animate-in fade-in zoom-in-95 duration-150">
           {/* 1. إضافة للمفضلة */}
           <button
             type="button"
@@ -238,7 +242,7 @@ export const MediaThreeDotsMenu: React.FC<MediaThreeDotsMenuProps> = ({
             </div>
           </button>
 
-          {/* Optional: فتح بمشغل خارجي */}
+          {/* 5. فتح كملف PDF خارجي / مشغل خارجي */}
           {onOpenExternal && (
             <button
               type="button"
@@ -246,10 +250,25 @@ export const MediaThreeDotsMenu: React.FC<MediaThreeDotsMenuProps> = ({
                 onOpenExternal();
                 setOpen(false);
               }}
-              className="w-full px-3 py-2 rounded-xl hover:bg-slate-800/80 flex items-center justify-end gap-3 text-[11px] font-bold text-slate-300 transition-colors cursor-pointer border-t border-slate-800 pt-2"
+              className="w-full px-3 py-2 rounded-xl hover:bg-slate-800/80 flex items-center justify-end gap-3 text-[11px] font-bold text-emerald-300 transition-colors cursor-pointer border-t border-slate-800 pt-2"
             >
-              <span>فتح بمشغل خارجي</span>
+              <span>{externalLabel || 'فتح بمشغل خارجي'}</span>
               <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+            </button>
+          )}
+
+          {/* Optional: معاينة داخل التطبيق */}
+          {onOpenInApp && (
+            <button
+              type="button"
+              onClick={() => {
+                onOpenInApp();
+                setOpen(false);
+              }}
+              className="w-full px-3 py-2 rounded-xl hover:bg-slate-800/80 flex items-center justify-end gap-3 text-[11px] font-bold text-slate-300 transition-colors cursor-pointer"
+            >
+              <span>معاينة داخل التطبيق</span>
+              <Play className="w-3.5 h-3.5 text-sky-400" />
             </button>
           )}
 

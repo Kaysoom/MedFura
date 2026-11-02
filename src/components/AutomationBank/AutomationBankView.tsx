@@ -88,7 +88,10 @@ import {
 } from '../../utils/mediaAndOfflineLogic';
 import {
   SubjectQuickFilterTab,
+  PersonalHierarchyCategory,
+  PERSONAL_HIERARCHY_TABS,
   getSubjectQuickTabQuestions,
+  buildPersonalHierarchyBreakdown,
 } from '../../utils/redesignStructureLogic';
 import confetti from 'canvas-confetti';
 
@@ -163,6 +166,16 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
   >('section');
   // Quick Personal Filter Sub-Tab inside Subject: 'none' | 'mistakes' | 'saved' | 'notes' (NO مكررة or معدلة)
   const [subjectQuickTab, setSubjectQuickTab] = useState<SubjectQuickFilterTab>('none');
+  // Hierarchical Category & Branch state inside Subject's Quick Personal Tabs (أخطائي | محفوظاتي | ملاحظاتي)
+  const [subjectQuickCategory, setSubjectQuickCategory] =
+    useState<PersonalHierarchyCategory>('section');
+  const [subjectQuickBranchKey, setSubjectQuickBranchKey] = useState<string | null>(null);
+
+  // Hierarchical Category & Branch state inside Global Hub Tabs (الأخطاء | المحفوظات والملاحظات)
+  const [globalPersonalCategory, setGlobalPersonalCategory] =
+    useState<PersonalHierarchyCategory>('section');
+  const [globalPersonalBranchKey, setGlobalPersonalBranchKey] = useState<string | null>(null);
+
   const [chapterListSearch, setChapterListSearch] = useState('');
   const [chapterStatusFilter, setChapterStatusFilter] = useState<'all' | 'in_progress' | 'completed' | 'not_started'>('all');
 
@@ -349,8 +362,14 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
     if (activeTab === 'mistakes' || activeTab === 'saved_notes') {
       commitExitFromMistakesOrSaved();
     }
+    setGlobalPersonalBranchKey(null);
     setActiveTab(nextTab);
   };
+
+  useEffect(() => {
+    setSubjectQuickTab('none');
+    setSubjectQuickBranchKey(null);
+  }, [selectedSubjectId]);
 
   const pendingReportsCount = useMemo(
     () => questionReports.filter(r => r.status === 'pending').length,
@@ -1175,13 +1194,29 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
                 <p>{questionNotes[q.id]}</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => handleOpenNoteModal(q.id)}
-              className="text-[11px] text-amber-400 underline hover:text-white shrink-0 cursor-pointer"
-            >
-              تعديل
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleOpenNoteModal(q.id)}
+                className="text-[11px] text-amber-400 underline hover:text-white cursor-pointer"
+              >
+                تعديل
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  openConfirmDialog({
+                    title: 'حذف الملاحظة الشخصية',
+                    message: 'هل تريد حذف ملاحظتك المدونة على هذا السؤال؟',
+                    itemName: questionNotes[q.id],
+                    onConfirm: () => deleteQuestionNote(q.id),
+                  })
+                }
+                className="text-[11px] text-rose-400 underline hover:text-rose-300 cursor-pointer"
+              >
+                حذف الملاحظة
+              </button>
+            </div>
           </div>
         )}
 
@@ -1300,6 +1335,229 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
             </button>
           </div>
         </div>
+      </div>
+    );
+  };
+
+  // Reusable Hierarchical Explorer for Mistakes (أخطائي), Saved (محفوظاتي), and Notes (ملاحظاتي)
+  // Divides items into the 4 main categories (الأقسام | المحاضرات | شامل وجزئي | كامل)
+  // Always keeps the 4 main category tabs visible, and shows non-empty branches for the first 3 categories
+  // or all questions directly on a single page when 'كامل' ('all') is selected.
+  const renderPersonalHierarchyExplorer = (config: {
+    kind: 'mistakes' | 'saved' | 'notes';
+    scope: 'subject' | 'global';
+    questionsList: QuestionItem[];
+    activeCategory: PersonalHierarchyCategory;
+    onSelectCategory: (cat: PersonalHierarchyCategory) => void;
+    selectedBranchKey: string | null;
+    onSelectBranchKey: (key: string | null) => void;
+  }) => {
+    const breakdown = buildPersonalHierarchyBreakdown(config.questionsList, subjects);
+    const activeTabStyle =
+      config.kind === 'mistakes'
+        ? 'bg-rose-500 text-white shadow-md'
+        : config.kind === 'saved'
+          ? 'bg-rose-500 text-white shadow-md'
+          : 'bg-amber-500 text-slate-950 shadow-md';
+
+    const countBadgeColor =
+      config.kind === 'mistakes'
+        ? 'bg-rose-500/15 border-rose-500/35 text-rose-300'
+        : config.kind === 'saved'
+          ? 'bg-rose-500/15 border-rose-500/35 text-rose-300'
+          : 'bg-amber-500/15 border-amber-500/35 text-amber-300';
+
+    const itemUnitLabel =
+      config.kind === 'mistakes'
+        ? 'أخطاء'
+        : config.kind === 'saved'
+          ? 'محفوظات'
+          : 'ملاحظات';
+
+    const emptyTitle =
+      config.kind === 'mistakes'
+        ? 'لا يوجد لديك أخطاء بعد'
+        : config.kind === 'saved'
+          ? 'لا يوجد لديك أسئلة محفوظة بعد'
+          : 'لا يوجد لديك ملاحظات بعد';
+
+    const categoryLabel =
+      PERSONAL_HIERARCHY_TABS.find((t) => t.id === config.activeCategory)?.label || '';
+
+    const renderEmptyState = (subLabel?: string) => (
+      <div className="bg-[#161F30] border border-slate-800/80 rounded-3xl p-8 sm:p-10 text-center space-y-3 shadow-md">
+        <div className="w-16 h-16 rounded-full bg-slate-800/80 border border-slate-700/70 flex items-center justify-center mx-auto">
+          {config.kind === 'mistakes' ? (
+            <div className="w-9 h-9 rounded-full bg-rose-500 flex items-center justify-center text-white shadow-md">
+              <X className="w-5 h-5 stroke-[3]" />
+            </div>
+          ) : config.kind === 'saved' ? (
+            <Heart className="w-8 h-8 fill-rose-500 text-rose-500" />
+          ) : (
+            <Edit3 className="w-8 h-8 text-amber-400" />
+          )}
+        </div>
+        <h3 className="text-sm sm:text-base font-black text-white">
+          {subLabel ? `${emptyTitle} في «${subLabel}»` : emptyTitle}
+        </h3>
+        <p className="text-xs text-slate-400 font-semibold">
+          ستظهر الفروع والأسئلة هنا تلقائياً أثناء حلك للأسئلة
+        </p>
+        {subLabel && breakdown.countsByCategory.all > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              config.onSelectCategory('all');
+              config.onSelectBranchKey(null);
+            }}
+            className="mt-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer transition-colors"
+          >
+            عرض كامل الأسئلة ({breakdown.countsByCategory.all})
+          </button>
+        )}
+      </div>
+    );
+
+    const categoryBranches =
+      config.activeCategory === 'all'
+        ? []
+        : breakdown.branchesByCategory[config.activeCategory];
+
+    const selectedBranch =
+      config.activeCategory !== 'all' && config.selectedBranchKey
+        ? categoryBranches.find((b) => b.branchKey === config.selectedBranchKey) || null
+        : null;
+
+    return (
+      <div className="space-y-3.5" dir="rtl">
+        {/* 4 Permanent Main Category Tabs: الأقسام | المحاضرات | شامل وجزئي | كامل */}
+        <div className="bg-[#161F30] border border-slate-800/80 rounded-2xl p-1.5 shadow-sm">
+          <div className="grid grid-cols-4 gap-1 bg-[#0E1625] p-1 rounded-xl border border-slate-800/80 text-[10.5px] sm:text-xs font-extrabold">
+            {PERSONAL_HIERARCHY_TABS.map((tab) => {
+              const isActive = config.activeCategory === tab.id;
+              const count = breakdown.countsByCategory[tab.id];
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    config.onSelectCategory(tab.id);
+                    config.onSelectBranchKey(null);
+                  }}
+                  className={`py-2 px-1 rounded-lg text-center transition-all cursor-pointer flex items-center justify-center gap-0.5 whitespace-nowrap ${
+                    isActive ? activeTabStyle : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  {count > 0 && (
+                    <span className="text-[10px] opacity-95 tabular-nums shrink-0">
+                      ({count})
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Content Area based on activeCategory & selectedBranch */}
+        {config.activeCategory === 'all' ? (
+          breakdown.allQuestions.length === 0 ? (
+            renderEmptyState()
+          ) : (
+            <div className="space-y-3.5">
+              {breakdown.allQuestions.map((q, idx) =>
+                renderInteractivePracticeCard(
+                  q,
+                  idx,
+                  config.kind === 'mistakes' ? 'mistakes' : 'saved'
+                )
+              )}
+            </div>
+          )
+        ) : selectedBranch ? (
+          /* Inside a Selected Branch (e.g. المحاضرة الأولى) */
+          <div className="space-y-3.5">
+            <div className="bg-[#161F30] border border-slate-800/80 rounded-2xl p-3.5 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => config.onSelectBranchKey(null)}
+                  className="px-3 py-1.5 rounded-xl bg-[#0E1625] hover:bg-slate-800 border border-slate-700/80 text-slate-200 text-xs font-bold flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors"
+                >
+                  <ArrowRight className="w-3.5 h-3.5" />
+                  <span>العودة إلى {categoryLabel}</span>
+                </button>
+
+                <span
+                  className={`px-2.5 py-1 rounded-xl border text-xs font-black tabular-nums shrink-0 ${countBadgeColor}`}
+                >
+                  {selectedBranch.questions.length} سؤال
+                </span>
+              </div>
+
+              <div className="text-right pt-0.5">
+                <h4 className="text-xs sm:text-sm font-black text-white leading-snug break-words">
+                  {selectedBranch.chapterName}
+                </h4>
+                {config.scope === 'global' && (
+                  <span className="text-[11px] text-slate-400 font-bold block mt-0.5">
+                    {selectedBranch.subjectName}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-3.5">
+              {selectedBranch.questions.map((q, idx) =>
+                renderInteractivePracticeCard(
+                  q,
+                  idx,
+                  config.kind === 'mistakes' ? 'mistakes' : 'saved'
+                )
+              )}
+            </div>
+          </div>
+        ) : categoryBranches.length === 0 ? (
+          renderEmptyState(categoryLabel)
+        ) : (
+          /* List of Non-Empty Branches within the Selected Category */
+          <div className="space-y-2.5">
+            {categoryBranches.map((branch, idx) => (
+              <button
+                key={branch.branchKey}
+                type="button"
+                onClick={() => config.onSelectBranchKey(branch.branchKey)}
+                className="w-full bg-[#161F30] hover:bg-[#1C273C] border border-slate-800/80 hover:border-emerald-500/40 rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-3 text-right transition-all cursor-pointer group shadow-xs"
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-9 h-9 rounded-xl bg-[#0E1625] border border-slate-800 text-emerald-400 font-black text-xs flex items-center justify-center shrink-0 tabular-nums">
+                    {idx + 1}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-black text-xs sm:text-sm text-white group-hover:text-emerald-400 transition-colors break-words">
+                      {branch.chapterName}
+                    </h4>
+                    {config.scope === 'global' && (
+                      <span className="text-[11px] text-slate-400 font-bold block mt-0.5">
+                        {branch.subjectName}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    className={`px-2.5 py-1 rounded-xl border text-[11px] font-black tabular-nums ${countBadgeColor}`}
+                  >
+                    {branch.questions.length} {itemUnitLabel}
+                  </span>
+                  <ChevronLeft className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition-colors" />
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
@@ -2599,9 +2857,10 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
               <div className="grid grid-cols-3 gap-2 pt-0.5 text-[11px] sm:text-xs font-bold">
                 <button
                   type="button"
-                  onClick={() =>
-                    setSubjectQuickTab(prev => (prev === 'mistakes' ? 'none' : 'mistakes'))
-                  }
+                  onClick={() => {
+                    setSubjectQuickTab((prev) => (prev === 'mistakes' ? 'none' : 'mistakes'));
+                    setSubjectQuickBranchKey(null);
+                  }}
                   className={`py-2 px-2.5 rounded-2xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     subjectQuickTab === 'mistakes'
                       ? 'bg-rose-500 border-rose-400 text-white shadow-md'
@@ -2621,9 +2880,10 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setSubjectQuickTab(prev => (prev === 'saved' ? 'none' : 'saved'))
-                  }
+                  onClick={() => {
+                    setSubjectQuickTab((prev) => (prev === 'saved' ? 'none' : 'saved'));
+                    setSubjectQuickBranchKey(null);
+                  }}
                   className={`py-2 px-2.5 rounded-2xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     subjectQuickTab === 'saved'
                       ? 'bg-rose-500 border-rose-400 text-white shadow-md'
@@ -2645,9 +2905,10 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setSubjectQuickTab(prev => (prev === 'notes' ? 'none' : 'notes'))
-                  }
+                  onClick={() => {
+                    setSubjectQuickTab((prev) => (prev === 'notes' ? 'none' : 'notes'));
+                    setSubjectQuickBranchKey(null);
+                  }}
                   className={`py-2 px-2.5 rounded-2xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     subjectQuickTab === 'notes'
                       ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-md'
@@ -2668,42 +2929,16 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
             </div>
 
             {subjectQuickTab !== 'none' ? (
-              /* Quick Personal Sub-Tab Content (Matching PDF Page 9) */
-              subjectQuickQuestions.length === 0 ? (
-                <div className="bg-[#161F30] border border-slate-800/80 rounded-3xl p-10 text-center space-y-3 shadow-md">
-                  <div className="w-16 h-16 rounded-full bg-slate-800/80 border border-slate-700/70 flex items-center justify-center mx-auto">
-                    {subjectQuickTab === 'mistakes' ? (
-                      <div className="w-9 h-9 rounded-full bg-rose-500 flex items-center justify-center text-white shadow-md">
-                        <X className="w-5 h-5 stroke-[3]" />
-                      </div>
-                    ) : subjectQuickTab === 'saved' ? (
-                      <Heart className="w-8 h-8 fill-rose-500 text-rose-500" />
-                    ) : (
-                      <Edit3 className="w-8 h-8 text-amber-400" />
-                    )}
-                  </div>
-                  <h3 className="text-sm sm:text-base font-black text-white">
-                    {subjectQuickTab === 'mistakes'
-                      ? 'لا يوجد لديك أخطاء بعد'
-                      : subjectQuickTab === 'saved'
-                      ? 'لا يوجد لديك أسئلة محفوظة بعد'
-                      : 'لا يوجد لديك ملاحظات بعد'}
-                  </h3>
-                  <p className="text-xs text-slate-400 font-semibold">
-                    ستظهر هنا أثناء حلك للأسئلة
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3.5">
-                  {subjectQuickQuestions.map((q, idx) =>
-                    renderInteractivePracticeCard(
-                      q,
-                      idx,
-                      subjectQuickTab === 'mistakes' ? 'mistakes' : 'saved'
-                    )
-                  )}
-                </div>
-              )
+              /* Quick Personal Sub-Tab Hierarchical Content (الأقسام | المحاضرات | شامل وجزئي | كامل) */
+              renderPersonalHierarchyExplorer({
+                kind: subjectQuickTab,
+                scope: 'subject',
+                questionsList: subjectQuickQuestions,
+                activeCategory: subjectQuickCategory,
+                onSelectCategory: setSubjectQuickCategory,
+                selectedBranchKey: subjectQuickBranchKey,
+                onSelectBranchKey: setSubjectQuickBranchKey,
+              })
             ) : activeChapterCategoryTab === 'my_quizzes' ? (
               /* Subject-Scoped Custom Random Quizzes ('اختباراتي' for this subject) */
               <MyQuizzesPanel
@@ -3526,7 +3761,7 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
         </div>
       )}
 
-      {/* TAB 2: MISTAKES BANK (بطاقات أتمتة تفاعلية غير محلولة، وتتحول إلى صح ضمن قسمها فور حلها وتختفي من الأخطاء بعد الخروج) */}
+      {/* TAB 2: MISTAKES BANK (مقسم هرمياً إلى: الأقسام | المحاضرات | شامل وجزئي | كامل) */}
       {activeTab === 'mistakes' && (
         <div className="space-y-4">
           <div className="bg-[#1A1325] border border-rose-500/40 rounded-3xl p-5 text-right space-y-2 shadow-lg">
@@ -3540,120 +3775,79 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
               </h2>
             </div>
             <p className="text-xs text-slate-200 leading-relaxed">
-              تُعرض هنا الأسئلة التي أخطأت بها كبطاقات أتمتة غير محلولة لتختبر نفسك بها مجدداً. عند الإجابة الصحيحة على أي سؤال هنا يتحول فوراً إلى (صح ✓) ضمن قسمه الأصلي، ويبقى أمامك لمراجعة التعليل ثم يختفي تلقائياً من بنك الأخطاء عند خروجك.
+              مقسم إلى الأقسام الرئيسية (الأقسام، المحاضرات، شامل وجزئي، وكامل). اختر القسم لعرض الفروع التي أخطأت فيها والتدرب عليها، أو اختر «كامل» لعرض جميع الأسئلة في صفحة واحدة.
             </p>
           </div>
 
-          {mistakeQuestionsList.length === 0 ? (
-            <div className="text-center py-16 bg-[#131D2E] rounded-3xl border border-dashed border-slate-800 p-8 space-y-3">
-              <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
-              <h3 className="font-bold text-base text-white">سجلك خالٍ من الأخطاء حالياً!</h3>
-              <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                أي سؤال تخطئ في حله داخل أقسام المواد سيظهر تلقائياً هنا كبطاقة اختبار غير محلولة لتتمكن من إتقانه.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {mistakeQuestionsList.map((q, idx) =>
-                renderInteractivePracticeCard(q, idx, 'mistakes')
-              )}
-            </div>
-          )}
+          {renderPersonalHierarchyExplorer({
+            kind: 'mistakes',
+            scope: 'global',
+            questionsList: mistakeQuestionsList,
+            activeCategory: globalPersonalCategory,
+            onSelectCategory: setGlobalPersonalCategory,
+            selectedBranchKey: globalPersonalBranchKey,
+            onSelectBranchKey: setGlobalPersonalBranchKey,
+          })}
         </div>
       )}
 
-      {/* TAB 3: SAVED & NOTES (تظهر المحفوظات كبطاقات أتمتة غير محلولة وتبقى محفوظة بعد الحل) */}
+      {/* TAB 3: SAVED & NOTES (مقسم هرمياً إلى: الأقسام | المحاضرات | شامل وجزئي | كامل) */}
       {activeTab === 'saved_notes' && (
         <div className="space-y-4">
           {/* Sub tabs */}
           <div className="flex items-center justify-center gap-2 border-b border-slate-800 pb-3">
             <button
               type="button"
-              onClick={() => setSavedNotesSubTab('saved')}
+              onClick={() => {
+                setSavedNotesSubTab('saved');
+                setGlobalPersonalBranchKey(null);
+              }}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 savedNotesSubTab === 'saved'
-                  ? 'bg-amber-600 text-white shadow-xs'
+                  ? 'bg-rose-600 text-white shadow-xs'
                   : 'bg-[#131D2E] text-slate-400 hover:text-white'
               }`}
             >
-              <Bookmark className="w-4 h-4" />
-              <span>الأسئلة المحفوظة ({savedQuestionsList.length})</span>
+              <Heart className="w-4 h-4" />
+              <span>محفوظاتي ({savedQuestionsList.length})</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setSavedNotesSubTab('notes')}
+              onClick={() => {
+                setSavedNotesSubTab('notes');
+                setGlobalPersonalBranchKey(null);
+              }}
               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 savedNotesSubTab === 'notes'
-                  ? 'bg-indigo-600 text-white shadow-xs'
+                  ? 'bg-amber-500 text-slate-950 shadow-xs'
                   : 'bg-[#131D2E] text-slate-400 hover:text-white'
               }`}
             >
-              <FileText className="w-4 h-4" />
-              <span>ملاحظاتي على الأتمتات ({noteQuestionsList.length})</span>
+              <Edit3 className="w-4 h-4" />
+              <span>ملاحظاتي ({noteQuestionsList.length})</span>
             </button>
           </div>
 
-          {savedNotesSubTab === 'saved' && (
-            <div className="space-y-4">
-              {savedQuestionsList.length === 0 ? (
-                <div className="text-center py-16 bg-[#131D2E] rounded-3xl border border-dashed border-slate-800 p-8 space-y-3">
-                  <Bookmark className="w-12 h-12 text-slate-500 mx-auto" />
-                  <h3 className="font-bold text-base text-white">لم تقم بحفظ أي سؤال بعد</h3>
-                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                    عند حل أي سؤال، اضغط على زر الحفظ ليتم حفظه هنا كبطاقة أتمتة غير محلولة للتدرب عليه متى شئت.
-                  </p>
-                </div>
-              ) : (
-                savedQuestionsList.map((q, idx) =>
-                  renderInteractivePracticeCard(q, idx, 'saved')
-                )
-              )}
-            </div>
-          )}
-
-          {savedNotesSubTab === 'notes' && (
-            <div className="space-y-3">
-              {noteQuestionsList.length === 0 ? (
-                <div className="text-center py-16 bg-[#131D2E] rounded-3xl border border-dashed border-slate-800 p-8 space-y-3">
-                  <FileText className="w-12 h-12 text-slate-500 mx-auto" />
-                  <h3 className="font-bold text-base text-white">لا توجد ملاحظات مدونة بعد</h3>
-                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                    يمكنك كتابة ملاحظة توضيحية على أي سؤال عبر زر الملاحظة لتظهر لك جميعاً في هذا السجل الأكاديمي.
-                  </p>
-                </div>
-              ) : (
-                noteQuestionsList.map((q) => (
-                  <div key={q.id} className="bg-[#131D2E] border border-slate-800 rounded-2xl p-4 text-right space-y-2.5">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openConfirmDialog({
-                            title: 'حذف الملاحظة الشخصية',
-                            message: 'هل تريد حذف ملاحظتك المدونة على هذا السؤال؟',
-                            itemName: questionNotes[q.id],
-                            onConfirm: () => deleteQuestionNote(q.id),
-                          })
-                        }
-                        className="text-xs text-rose-400 hover:underline cursor-pointer"
-                      >
-                        حذف الملاحظة
-                      </button>
-                      <span className="text-xs font-bold text-indigo-400">سؤال مع ملاحظة</span>
-                    </div>
-
-                    <p className="text-xs sm:text-sm font-bold text-white">{q.questionText}</p>
-
-                    <div className="p-3 bg-indigo-950/30 border border-indigo-900/50 rounded-xl text-xs text-indigo-200">
-                      <strong className="block text-indigo-300 font-bold mb-1">الملاحظة المدونة:</strong>
-                      <p>{questionNotes[q.id]}</p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
+          {savedNotesSubTab === 'saved'
+            ? renderPersonalHierarchyExplorer({
+                kind: 'saved',
+                scope: 'global',
+                questionsList: savedQuestionsList,
+                activeCategory: globalPersonalCategory,
+                onSelectCategory: setGlobalPersonalCategory,
+                selectedBranchKey: globalPersonalBranchKey,
+                onSelectBranchKey: setGlobalPersonalBranchKey,
+              })
+            : renderPersonalHierarchyExplorer({
+                kind: 'notes',
+                scope: 'global',
+                questionsList: noteQuestionsList,
+                activeCategory: globalPersonalCategory,
+                onSelectCategory: setGlobalPersonalCategory,
+                selectedBranchKey: globalPersonalBranchKey,
+                onSelectBranchKey: setGlobalPersonalBranchKey,
+              })}
         </div>
       )}
 

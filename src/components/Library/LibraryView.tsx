@@ -288,8 +288,32 @@ export const LibraryView: React.FC = () => {
     });
   };
 
+  // Open file directly as an external PDF file (without share sheet)
+  const handleOpenExternalPdf = async (file: LibraryFileItem) => {
+    const medfurMeta = resolveFileMedFurMeta(
+      file.folderId,
+      file.title,
+      file.format || 'pdf'
+    );
+    await launchMediaInExternalPlayer({
+      id: file.id,
+      url: file.downloadUrl,
+      fileName: medfurMeta.fileName,
+      mimeType: 'application/pdf',
+      title: file.title,
+      subtitle: file.fileType,
+      authorOrDoctor: file.author,
+      itemType: 'file',
+      pages: file.pages,
+      format: file.format || 'PDF',
+      virtualPath: medfurMeta.virtualPath,
+    });
+    setDownloadNotice(`تم فتح الملف كملف PDF خارجي: ${file.title}`);
+    setTimeout(() => setDownloadNotice(null), 3000);
+  };
+
   // Primary click on file card (Pages 2, 4, 5):
-  // - If already downloaded offline -> open directly in In-App Viewer
+  // - If already downloaded offline -> open directly as an external PDF file (per user preference)
   // - If not downloaded yet -> start inline circular download immediately
   const handlePrimaryFileClick = (file: LibraryFileItem) => {
     const progress = activeDownloads[file.id];
@@ -299,7 +323,7 @@ export const LibraryView: React.FC = () => {
     }
     const isOffline = cachedIds.includes(file.id);
     if (isOffline) {
-      openFileDirectlyInApp(file);
+      handleOpenExternalPdf(file);
     } else {
       handleDownloadFile(file);
     }
@@ -756,15 +780,9 @@ export const LibraryView: React.FC = () => {
             onDownloadOffline={() => handleDownloadFile(file, true)}
             onShare={() => handleShareFile(file)}
             onSendTelegram={() => handleSendFileTelegram(file)}
-            onOpenExternal={() => {
-              launchMediaInExternalPlayer({
-                id: file.id,
-                url: file.downloadUrl,
-                fileName: medfurMeta.fileName,
-                mimeType: file.mimeType || 'application/pdf',
-                title: file.title,
-              });
-            }}
+            onOpenExternal={() => handleOpenExternalPdf(file)}
+            externalLabel="فتح كملف PDF خارجي"
+            onOpenInApp={() => openFileDirectlyInApp(file)}
             onEdit={isAdmin ? () => handleOpenEditFileModal(file) : undefined}
             onDelete={
               isAdmin

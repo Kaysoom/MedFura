@@ -9,8 +9,18 @@ import {
   getSubjectQuickTabQuestions,
   groupSubjectVideosIntoSections,
   sortRootLibraryFolders,
+  buildPersonalHierarchyBreakdown,
+  PERSONAL_HIERARCHY_TABS,
+  buildValidPdfBinaryBytes,
 } from './redesignStructureLogic.ts';
-import type { LibraryFileItem, LibraryFolderItem, MarketplaceItem, QuestionItem, VideoItem } from '../types.ts';
+import type {
+  LibraryFileItem,
+  LibraryFolderItem,
+  MarketplaceItem,
+  QuestionItem,
+  SubjectItem,
+  VideoItem,
+} from '../types.ts';
 
 describe('redesignStructureLogic', () => {
   it('hides global header inside sub-sections and shows it only on home', () => {
@@ -200,4 +210,102 @@ describe('redesignStructureLogic', () => {
     assert.equal(sorted[1].name, 'السنة الثانية');
     assert.equal(sorted[2].name, 'مراجع طبية');
   });
+
+  it('builds hierarchical 4-category breakdown for mistakes/saved/notes showing only non-empty branches', () => {
+    assert.deepEqual(
+      PERSONAL_HIERARCHY_TABS.map((t) => t.label),
+      ['الأقسام', 'المحاضرات', 'شامل وجزئي', 'كامل']
+    );
+
+    const subjects: SubjectItem[] = [
+      {
+        id: 'sub-1',
+        name: 'التشريح العام',
+        yearId: 'year-2',
+        semester: 'sem-1',
+        icon: 'Anatomy',
+        color: '#10b981',
+        chapters: [
+          { id: 'ch-sec-1', name: 'القسم الأول: الطرف العلوي', category: 'section' },
+          { id: 'ch-sec-2', name: 'القسم الثاني: الطرف السفلي', category: 'section' },
+          { id: 'ch-lec-1', name: 'المحاضرة الأولى: عظام الكتف', category: 'lecture' },
+          { id: 'ch-lec-2', name: 'المحاضرة الثانية: عضلات الذراع', category: 'lecture' },
+          { id: 'ch-comp-1', name: 'امتحان شامل 1', category: 'comprehensive_partial' },
+        ],
+      },
+    ];
+
+    // Student only made mistakes in Lecture 1 ('ch-lec-1') and Section 1 ('ch-sec-1')
+    const mistakeQuestions: QuestionItem[] = [
+      {
+        id: 'q-lec-1a',
+        subjectId: 'sub-1',
+        chapterId: 'ch-lec-1',
+        questionText: 'سؤال في المحاضرة الأولى 1',
+        optionA: 'A',
+        optionB: 'B',
+        optionC: 'C',
+        optionD: 'D',
+        correctOptionIndex: 0,
+      },
+      {
+        id: 'q-lec-1b',
+        subjectId: 'sub-1',
+        chapterId: 'ch-lec-1',
+        questionText: 'سؤال في المحاضرة الأولى 2',
+        optionA: 'A',
+        optionB: 'B',
+        optionC: 'C',
+        optionD: 'D',
+        correctOptionIndex: 1,
+      },
+      {
+        id: 'q-sec-1a',
+        subjectId: 'sub-1',
+        chapterId: 'ch-sec-1',
+        questionText: 'سؤال في القسم الأول',
+        optionA: 'A',
+        optionB: 'B',
+        optionC: 'C',
+        optionD: 'D',
+        correctOptionIndex: 2,
+      },
+    ];
+
+    const breakdown = buildPersonalHierarchyBreakdown(mistakeQuestions, subjects);
+    assert.equal(breakdown.countsByCategory.section, 1);
+    assert.equal(breakdown.countsByCategory.lecture, 2);
+    assert.equal(breakdown.countsByCategory.comprehensive_partial, 0);
+    assert.equal(breakdown.countsByCategory.all, 3);
+
+    // Only Lecture 1 appears under 'lecture' (Lecture 2 has 0 mistakes so it is hidden)
+    assert.equal(breakdown.branchesByCategory.lecture.length, 1);
+    assert.equal(breakdown.branchesByCategory.lecture[0].chapterId, 'ch-lec-1');
+    assert.equal(
+      breakdown.branchesByCategory.lecture[0].chapterName,
+      'المحاضرة الأولى: عظام الكتف'
+    );
+    assert.equal(breakdown.branchesByCategory.lecture[0].questions.length, 2);
+
+    // Only Section 1 appears under 'section' (Section 2 has 0 mistakes so it is hidden)
+    assert.equal(breakdown.branchesByCategory.section.length, 1);
+    assert.equal(breakdown.branchesByCategory.section[0].chapterId, 'ch-sec-1');
+
+    // 'comprehensive_partial' has 0 non-empty branches
+    assert.equal(breakdown.branchesByCategory.comprehensive_partial.length, 0);
+
+    // 'all' has all 3 questions directly
+    assert.equal(breakdown.allQuestions.length, 3);
+  });
+
+  it('generates a valid %PDF-1.4 binary buffer ending with %%EOF', () => {
+    const bytes = buildValidPdfBinaryBytes({
+      title: 'تشريح العصبية - المحاضرة الأولى',
+      pages: 12,
+    });
+    const text = new TextDecoder().decode(bytes);
+    assert.ok(text.startsWith('%PDF-1.4'));
+    assert.ok(text.trimEnd().endsWith('%%EOF'));
+  });
 });
+

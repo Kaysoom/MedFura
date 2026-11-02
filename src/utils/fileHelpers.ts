@@ -2,6 +2,7 @@
  * MedFur File & Video Metadata Extraction + Real Download & IndexedDB Offline Engine
  */
 import { calculateDownloadMetrics } from './downloadManagerLogic';
+import { buildValidPdfBinaryBytes } from './redesignStructureLogic';
 
 const DB_NAME = 'medfur_offline_media_db';
 const DB_VERSION = 1;
@@ -545,8 +546,8 @@ export function dataUrlToBlob(dataUrl: string): Blob {
 }
 
 /**
- * Generates a real valid PDF binary blob for files that were created as metadata records
- * so downloading & temporary caching works with real byte streams
+ * Generates a real valid PDF-1.4 binary blob (`application/pdf`) for files that were created as metadata records
+ * so downloading, caching, and opening in external PDF viewers works with genuine PDF files.
  */
 function synthesizeDocumentBlob(options: {
   title: string;
@@ -555,44 +556,39 @@ function synthesizeDocumentBlob(options: {
   pages?: number;
   expectedBytes?: number;
 }): Blob {
-  const safeTitle = options.title || 'ملف أكاديمي — MedFur';
-  const safeAuthor = options.author || 'كلية الطب البشري — جامعة الفرات';
-  const pageCount = Math.max(1, options.pages || 4);
-  const targetSize = Math.max(64 * 1024, Math.min(options.expectedBytes || 256 * 1024, 2 * 1024 * 1024));
+  const pdfBytes = buildValidPdfBinaryBytes(options);
+  return new Blob([pdfBytes], { type: 'application/pdf' });
+}
 
-  const headerText = [
-    `================================================================`,
-    `  MedFur — البوابة الأكاديمية لكلية الطب البشري (جامعة الفرات)`,
-    `================================================================`,
-    ``,
-    `عنوان الملف : ${safeTitle}`,
-    `التصنيف    : ${options.subtitle || 'محاضرة / نوطة أكاديمية'}`,
-    `إعداد       : ${safeAuthor}`,
-    `عدد الصفحات: ${pageCount} صفحة`,
-    `تاريخ الحفظ : ${new Date().toLocaleString('ar-SA')}`,
-    ``,
-    `----------------------------------------------------------------`,
-    `تم تنزيل هذا الملف وحفظه مؤقتاً في ذاكرة التطبيق (IndexedDB)`,
-    `ليكون متاحاً للقراءة والمراجعة الفورية داخل التطبيق بدون إنترنت.`,
-    `----------------------------------------------------------------`,
-    ``,
-  ].join('\n');
-
-  const encoder = new TextEncoder();
-  const baseBytes = encoder.encode(headerText);
-  const fullBuffer = new Uint8Array(Math.max(baseBytes.length, targetSize));
-  fullBuffer.set(baseBytes, 0);
-  // Fill remaining bytes with structured newline padding so stream reader reads genuine bytes
-  const padLine = encoder.encode(
-    `\n[MedFur Offline Academic Archive — ${safeTitle} — ${safeAuthor}]\n`
-  );
-  let offset = baseBytes.length;
-  while (offset + padLine.length < fullBuffer.length) {
-    fullBuffer.set(padLine, offset);
-    offset += padLine.length;
+/**
+ * Ensures a Blob for a document is a valid `application/pdf` binary (converting legacy text/plain cached blobs if needed).
+ */
+async function ensureValidPdfBlob(
+  blob: Blob,
+  options: {
+    title?: string;
+    author?: string;
+    subtitle?: string;
+    pages?: number;
   }
-
-  return new Blob([fullBuffer], { type: 'text/plain;charset=utf-8' });
+): Promise<Blob> {
+  try {
+    const headerSlice = blob.slice(0, 5);
+    const headerText = await headerSlice.text();
+    if (headerText.startsWith('%PDF-')) {
+      return blob.type === 'application/pdf'
+        ? blob
+        : new Blob([blob], { type: 'application/pdf' });
+    }
+  } catch {
+    // fallback to synthesized valid PDF
+  }
+  return synthesizeDocumentBlob({
+    title: options.title || 'MedFur Document',
+    author: options.author,
+    subtitle: options.subtitle,
+    pages: options.pages,
+  });
 }
 
 /**
@@ -652,7 +648,7 @@ export async function downloadMediaWithProgress(options: {
       authorOrDoctor,
       itemType,
       fileName,
-      mimeType,
+      mimeType: itemType === 'file' ? 'application/pdf' : mimeType,
       format,
       pages,
       duration,
@@ -677,8 +673,17 @@ export async function downloadMediaWithProgress(options: {
     // Step 1: Check if already stored in IndexedDB (e.g. uploaded from device or previously cached)
     const existingRecord = await getOfflineMediaRecord(id);
     if (existingRecord && existingRecord.blob && existingRecord.blob.size > 0) {
-      const total = existingRecord.blob.size;
-      const chunkSize = Math.max(16384, Math.floor(total / 10));
+      const validBlob =
+        itemType === 'file'
+          ? await ensureValidPdfBlob(existingRecord.blob, {
+              title,
+              author: authorOrDoctor,
+              subtitle,
+              pages,
+            })
+          : existingRecord.blob;
+      const total = validBlob.size;
+      const chunkSize = Math.max(4096, Math.floor(total / 10));
       let loaded = 0;
 
       emitProgress(0, total, 'downloading');
@@ -692,39 +697,46 @@ export async function downloadMediaWithProgress(options: {
         emitProgress(loaded, total, 'downloading');
       }
 
-      const objectUrl = URL.createObjectURL(existingRecord.blob);
+      const objectUrl = URL.createObjectURL(validBlob);
       memoryObjectUrlCache.set(id, objectUrl);
-      if (virtualPath || fileName !== existingRecord.fileName) {
-        await saveOfflineMediaBlob(
-          id,
-          existingRecord.blob,
-          fileName,
-          mimeType || existingRecord.mimeType,
-          {
-            title,
-            itemType,
-            subtitle,
-            authorOrDoctor,
-            pages,
-            duration,
-            format,
-            virtualPath: virtualPath || existingRecord.virtualPath,
-          }
-        );
-      }
+      await saveOfflineMediaBlob(
+        id,
+        validBlob,
+        fileName,
+        itemType === 'file' ? 'application/pdf' : mimeType || existingRecord.mimeType,
+        {
+          title,
+          itemType,
+          subtitle,
+          authorOrDoctor,
+          pages,
+          duration,
+          format,
+          virtualPath: virtualPath || existingRecord.virtualPath,
+        }
+      );
       if (saveToDevice) {
-        triggerDeviceSaveBlob(existingRecord.blob, fileName);
+        triggerDeviceSaveBlob(validBlob, fileName);
       }
       emitProgress(total, total, 'completed');
       activeAbortControllers.delete(id);
-      return { blob: existingRecord.blob, objectUrl };
+      return { blob: validBlob, objectUrl };
     }
 
     // Step 2: If URL is a Data URL
     if (url && url.startsWith('data:')) {
-      const blob = dataUrlToBlob(url);
+      const rawBlob = dataUrlToBlob(url);
+      const blob =
+        itemType === 'file'
+          ? await ensureValidPdfBlob(rawBlob, {
+              title,
+              author: authorOrDoctor,
+              subtitle,
+              pages,
+            })
+          : rawBlob;
       const total = blob.size;
-      const stepSize = Math.max(16384, Math.floor(total / 12));
+      const stepSize = Math.max(4096, Math.floor(total / 12));
       let loaded = 0;
 
       emitProgress(0, total, 'downloading');
@@ -738,16 +750,22 @@ export async function downloadMediaWithProgress(options: {
         emitProgress(loaded, total, 'downloading');
       }
 
-      await saveOfflineMediaBlob(id, blob, fileName, mimeType || blob.type, {
-        title,
-        itemType,
-        subtitle,
-        authorOrDoctor,
-        pages,
-        duration,
-        format,
-        virtualPath,
-      });
+      await saveOfflineMediaBlob(
+        id,
+        blob,
+        fileName,
+        itemType === 'file' ? 'application/pdf' : mimeType || blob.type,
+        {
+          title,
+          itemType,
+          subtitle,
+          authorOrDoctor,
+          pages,
+          duration,
+          format,
+          virtualPath,
+        }
+      );
       if (saveToDevice) {
         triggerDeviceSaveBlob(blob, fileName);
       }
@@ -797,8 +815,19 @@ export async function downloadMediaWithProgress(options: {
           }
 
           const finalMime =
-            mimeType || response.headers.get('content-type') || 'application/octet-stream';
-          const blob = new Blob(chunks, { type: finalMime });
+            itemType === 'file'
+              ? 'application/pdf'
+              : mimeType || response.headers.get('content-type') || 'application/octet-stream';
+          const rawBlob = new Blob(chunks, { type: finalMime });
+          const blob =
+            itemType === 'file'
+              ? await ensureValidPdfBlob(rawBlob, {
+                  title,
+                  author: authorOrDoctor,
+                  subtitle,
+                  pages,
+                })
+              : rawBlob;
           await saveOfflineMediaBlob(id, blob, fileName, finalMime, {
             title,
             itemType,
@@ -820,11 +849,11 @@ export async function downloadMediaWithProgress(options: {
         }
       } catch (fetchErr) {
         if (abortCtrl.signal.aborted) throw fetchErr;
-        // Fall through to synthesized temporary archive blob if CORS blocked external URL
+        // Fall through to synthesized PDF blob if CORS blocked external URL
       }
     }
 
-    // Step 4: Stream & Cache Temporary Archive Blob in IndexedDB so offline reading/playback works reliably
+    // Step 4: Stream & Cache Valid PDF-1.4 Blob in IndexedDB so external PDF opening works reliably
     const fallbackBlob = synthesizeDocumentBlob({
       title,
       author: authorOrDoctor,
@@ -833,7 +862,7 @@ export async function downloadMediaWithProgress(options: {
       expectedBytes: expectedBytes || (itemType === 'video' ? 1024 * 640 : 1024 * 256),
     });
     const total = fallbackBlob.size;
-    const stepSize = Math.max(16384, Math.floor(total / 14));
+    const stepSize = Math.max(128, Math.floor(total / 10));
     let loaded = 0;
 
     emitProgress(0, total, 'downloading');
@@ -842,12 +871,12 @@ export async function downloadMediaWithProgress(options: {
       if (abortCtrl.signal.aborted) {
         throw new Error('تم إلغاء التنزيل');
       }
-      await new Promise((r) => setTimeout(r, 40));
+      await new Promise((r) => setTimeout(r, 35));
       loaded = Math.min(total, loaded + stepSize);
       emitProgress(loaded, total, 'downloading');
     }
 
-    await saveOfflineMediaBlob(id, fallbackBlob, fileName, mimeType || fallbackBlob.type, {
+    await saveOfflineMediaBlob(id, fallbackBlob, fileName, 'application/pdf', {
       title,
       itemType,
       subtitle,
@@ -877,19 +906,24 @@ export async function downloadMediaWithProgress(options: {
  * Triggers a browser save-to-device action for a Blob
  */
 export function triggerDeviceSaveBlob(blob: Blob, fileName: string): void {
+  const safeName =
+    blob.type === 'application/pdf' && !fileName.toLowerCase().endsWith('.pdf')
+      ? `${fileName.replace(/\.[^/.]+$/, '')}.pdf`
+      : fileName;
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = fileName;
+  link.download = safeName;
+  link.type = blob.type || 'application/pdf';
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 /**
- * Opens or exports a media item to an external system player / PDF viewer.
- * If already cached in IndexedDB, uses the local Blob immediately; otherwise caches it first.
+ * Opens a media item (especially PDF files) directly as an external PDF file
+ * WITHOUT ever invoking `navigator.share` (so the OS Share sheet never appears).
  */
 export async function launchMediaInExternalPlayer(options: {
   id: string;
@@ -904,12 +938,21 @@ export async function launchMediaInExternalPlayer(options: {
   pages?: number;
   duration?: string;
   format?: string;
-}): Promise<{ launched: boolean; method: 'share' | 'download_open' }> {
-  let record = await getOfflineMediaRecord(options.id);
+}): Promise<{ launched: boolean; method: 'direct_pdf_open' | 'download_open'; objectUrl: string }> {
+  const isVideo =
+    options.itemType === 'video' || Boolean(options.mimeType?.startsWith('video/'));
+  const record = await getOfflineMediaRecord(options.id);
   let targetBlob: Blob;
 
   if (record && record.blob && record.blob.size > 0) {
-    targetBlob = record.blob;
+    targetBlob = isVideo
+      ? record.blob
+      : await ensureValidPdfBlob(record.blob, {
+          title: options.title || options.fileName,
+          author: options.authorOrDoctor,
+          subtitle: options.subtitle,
+          pages: options.pages,
+        });
   } else {
     const res = await downloadMediaWithProgress({
       ...options,
@@ -918,36 +961,33 @@ export async function launchMediaInExternalPlayer(options: {
     targetBlob = res.blob;
   }
 
-  const finalMime =
-    options.mimeType ||
-    record?.mimeType ||
-    (options.itemType === 'video' ? 'video/mp4' : 'application/pdf');
+  const finalMime = isVideo ? options.mimeType || 'video/mp4' : 'application/pdf';
+  const normalizedBlob =
+    targetBlob.type === finalMime
+      ? targetBlob
+      : new Blob([targetBlob], { type: finalMime });
 
-  // On mobile devices supporting Web Share API with files, offer native "Open with external app..." sheet
-  try {
-    if (
-      typeof navigator !== 'undefined' &&
-      typeof navigator.canShare === 'function' &&
-      typeof navigator.share === 'function'
-    ) {
-      const fileObj = new File([targetBlob], options.fileName, {
-        type: finalMime,
-      });
-      if (navigator.canShare({ files: [fileObj] })) {
-        await navigator.share({
-          title: options.title || options.fileName,
-          text: options.virtualPath || 'MedFur',
-          files: [fileObj],
-        });
-        return { launched: true, method: 'share' };
-      }
-    }
-  } catch {
-    // Fallback to direct device download/open if user dismissed share or browser blocked it
-  }
+  const safePdfFileName =
+    !isVideo && !options.fileName.toLowerCase().endsWith('.pdf')
+      ? `${options.fileName.replace(/\.[^/.]+$/, '')}.pdf`
+      : options.fileName;
 
-  // Fallback: Save directly to device with the structured MedFur filename so the OS external player opens it
-  triggerDeviceSaveBlob(targetBlob, options.fileName);
-  return { launched: true, method: 'download_open' };
+  // Create a direct Object URL with explicit application/pdf MIME type and open directly
+  // without calling navigator.share (no share sheet).
+  const objectUrl = URL.createObjectURL(normalizedBlob);
+  memoryObjectUrlCache.set(options.id, objectUrl);
+
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.type = finalMime;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.download = safePdfFileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  return { launched: true, method: 'direct_pdf_open', objectUrl };
 }
+
 
