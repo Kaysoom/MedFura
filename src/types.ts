@@ -460,6 +460,7 @@ export type ActiveSection =
   | 'library' 
   | 'marketplace' 
   | 'videos' 
+  | 'downloads'
   | 'grades' 
   | 'announcements'
   | 'discussions'

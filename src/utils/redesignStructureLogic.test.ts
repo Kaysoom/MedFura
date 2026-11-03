@@ -12,6 +12,8 @@ import {
   buildPersonalHierarchyBreakdown,
   PERSONAL_HIERARCHY_TABS,
   buildValidPdfBinaryBytes,
+  shouldShowInitialSplash,
+  APP_LOGO_ASSET_PATH,
 } from './redesignStructureLogic.ts';
 import type {
   LibraryFileItem,
@@ -23,6 +25,14 @@ import type {
 } from '../types.ts';
 
 describe('redesignStructureLogic', () => {
+  it('controls initial splash visibility and respects ?autostart=1', () => {
+    assert.equal(shouldShowInitialSplash('', false), true);
+    assert.equal(shouldShowInitialSplash('?autostart=1', false), false);
+    assert.equal(shouldShowInitialSplash('?skipIntro=1', false), false);
+    assert.equal(shouldShowInitialSplash('', true), false);
+    assert.ok(APP_LOGO_ASSET_PATH.includes('1793538605931_8b9593df.jpg'));
+  });
+
   it('hides global header inside sub-sections and shows it only on home', () => {
     assert.equal(shouldShowGlobalHeader('home'), true);
     assert.equal(shouldShowGlobalHeader('library'), false);

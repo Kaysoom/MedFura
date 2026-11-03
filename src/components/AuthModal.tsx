@@ -15,6 +15,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { InAppSelect } from './Common/InAppSelect';
+import { APP_LOGO_ASSET_PATH } from '../utils/redesignStructureLogic';
 
 export const AuthModal: React.FC = () => {
   const { 
@@ -80,7 +81,7 @@ export const AuthModal: React.FC = () => {
       <div className="relative w-full max-w-md max-h-[92dvh] overflow-y-auto bg-white dark:bg-[#0E172A] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800">
         
         {/* Header bar */}
-        <div className="sticky top-0 z-10 bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 p-4 sm:p-5 text-white text-center">
+        <div className="sticky top-0 z-10 bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 p-4 sm:p-5 text-white text-center space-y-2">
           <button
             onClick={() => setIsAuthModalOpen(false)}
             className="absolute top-3.5 left-3.5 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
@@ -88,6 +89,14 @@ export const AuthModal: React.FC = () => {
           >
             <X className="w-5 h-5" />
           </button>
+
+          <div className="w-11 h-11 mx-auto rounded-2xl bg-white p-1 shadow-lg flex items-center justify-center overflow-hidden">
+            <img
+              src={APP_LOGO_ASSET_PATH}
+              alt="MedFur Logo"
+              className="w-full h-full object-cover scale-[2.15]"
+            />
+          </div>
 
           <h2 className="text-base sm:text-lg font-black">
             تسجيل الدخول — MedFur

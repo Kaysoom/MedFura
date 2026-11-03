@@ -1,21 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
-  <!-- Clean Flat Dark Emerald Background (No 3D shadows or outer margins) -->
-  <rect width="512" height="512" rx="96" fill="#052E24" />
-
-  <!-- Pure MF Graduation Cap Symbol (Top Isometric M & F Diamond + Right Tassel) -->
-  <path
-    d="M250 48 L26 205 L60 231 L250 97 L283 121 L151 215 L235 276 L354 191 L378 209 L235 312 L106 218 L73 242 L250 371 L433 240 L433 380 L477 380 L477 205 L250 48 Z"
-    fill="#00B371"
-  />
-  <!-- Inner F Crossbar -->
-  <path
-    d="M316 145 L197 230 L228 253 L347 168 L316 145 Z"
-    fill="#00B371"
-  />
-
-  <!-- Graduation Cap Base Underneath -->
-  <path
-    d="M82 293 L82 387 L237 475 L391 387 L391 312 L237 401 L82 293 Z"
-    fill="#00B371"
-  />
+  <defs>
+    <filter id="medfurShadow" x="-10%" y="-10%" width="125%" height="125%">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#052E24" flood-opacity="0.16" />
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="108" fill="#FFFFFF" />
+  <!-- Exact Geometric MF Diamond Monogram (Rotated -45 deg around center 256,256) -->
+  <g transform="translate(256 256) rotate(-45) translate(-145 -145)" fill="#0D9B68" filter="url(#medfurShadow)">
+    <!-- Top-left edge of diamond (y=0..38, x=0..290) -->
+    <rect x="0" y="0" width="290" height="38" />
+    <!-- Top-right edge of diamond (x=252..290, y=0..290) -->
+    <rect x="252" y="0" width="38" height="290" />
+    <!-- Bottom-left edge of diamond (x=0..38, y=54..290, gap at y=38..54) -->
+    <rect x="0" y="54" width="38" height="236" />
+    <!-- Bottom-right edge of diamond (y=252..290, x=54..290, gap at x=38..54) -->
+    <rect x="54" y="252" width="236" height="38" />
+    <!-- Inner Bar 1 (attached to bottom-left edge, y=63..101, x=0..220) -->
+    <rect x="0" y="63" width="220" height="38" />
+    <!-- Inner Bar 2 (attached to top-right edge, y=126..164, x=70..290) -->
+    <rect x="70" y="126" width="220" height="38" />
+    <!-- Inner Bar 3 (attached to bottom-left edge, y=189..227, x=0..220) -->
+    <rect x="0" y="189" width="220" height="38" />
+  </g>
 </svg>

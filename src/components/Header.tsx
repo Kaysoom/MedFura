@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { usePWAInstall } from './Common/PWAInstallPrompt';
 import { clearAllOfflineMedia } from '../utils/fileHelpers';
+import { APP_LOGO_ASSET_PATH } from '../utils/redesignStructureLogic';
 
 export const COLOR_THEMES: {
   id: ColorThemeId;
@@ -262,6 +263,7 @@ export const Header: React.FC = () => {
     { id: 'automation' as ActiveSection, label: 'بنك الأتمتة', icon: CheckCircle2, color: 'text-rose-400 bg-rose-500/15' },
     { id: 'library' as ActiveSection, label: 'المكتبة والأرشيف', icon: FolderArchive, color: 'text-purple-400 bg-purple-500/15' },
     { id: 'videos' as ActiveSection, label: 'المرئيات والشروحات', icon: Video, color: 'text-pink-400 bg-pink-500/15' },
+    { id: 'downloads' as ActiveSection, label: 'التنزيلات', icon: Download, color: 'text-emerald-400 bg-emerald-500/15' },
     { id: 'grades' as ActiveSection, label: 'العلامات والترتيب', icon: Award, color: 'text-blue-400 bg-blue-500/15' },
     { id: 'marketplace' as ActiveSection, label: 'سوق المستلزمات', icon: ShoppingBag, color: 'text-amber-400 bg-amber-500/15' },
     { id: 'discussions' as ActiveSection, label: 'الملتقى الطلابي', icon: Users, color: 'text-cyan-400 bg-cyan-500/15' },
@@ -311,9 +313,16 @@ export const Header: React.FC = () => {
                   setSelectedChapterId(null);
                 }}
                 aria-label="MedFur الصفحة الأساسية"
-                className="flex items-center gap-1 cursor-pointer group min-w-0 px-1.5 py-1 rounded-lg hover:bg-white/5 transition-colors"
+                className="flex items-center gap-2 cursor-pointer group min-w-0 px-1.5 py-1 rounded-lg hover:bg-white/5 transition-colors"
                 title="MedFur"
               >
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white p-0.5 shadow-xs ring-1 ring-emerald-500/30 flex items-center justify-center overflow-hidden shrink-0">
+                  <img
+                    src={APP_LOGO_ASSET_PATH}
+                    alt="MedFur Logo"
+                    className="w-full h-full object-cover scale-[2.15]"
+                  />
+                </div>
                 <span className="font-black text-base sm:text-lg tracking-tight bg-clip-text text-transparent medfur-brand-gradient bg-gradient-to-l from-emerald-400 to-sky-400">
                   MedFur
                 </span>
@@ -847,13 +856,40 @@ export const Header: React.FC = () => {
                   <X className="w-4 h-4" />
                 </button>
 
-                <div className="text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <span className="font-black text-xs text-emerald-400 tracking-tight">MedFur</span>
-                    <h3 className="font-bold text-sm text-white">
-                      {user?.displayName || 'طالب طب بشري'}
-                    </h3>
+                <div className="flex items-center gap-2.5 text-right">
+                  <div>
+                    <div className="flex items-center justify-end gap-1.5">
+                      <span className="font-black text-xs text-emerald-400 tracking-tight">MedFur</span>
+                      <h3 className="font-bold text-sm text-white">
+                        {user?.displayName || 'طالب طب بشري'}
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDrawerOpen(false);
+                        window.dispatchEvent(new CustomEvent('medfur:replay-splash'));
+                      }}
+                      className="text-[10px] font-bold text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer"
+                    >
+                      عرض افتتاحية التطبيق
+                    </button>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDrawerOpen(false);
+                      window.dispatchEvent(new CustomEvent('medfur:replay-splash'));
+                    }}
+                    title="عرض غلاف وافتتاحية التطبيق"
+                    className="w-10 h-10 rounded-xl bg-white p-1 shadow-md ring-2 ring-emerald-500/30 flex items-center justify-center overflow-hidden shrink-0 cursor-pointer"
+                  >
+                    <img
+                      src={APP_LOGO_ASSET_PATH}
+                      alt="شعار MedFur"
+                      className="w-full h-full object-cover scale-[2.15]"
+                    />
+                  </button>
                 </div>
               </div>
 

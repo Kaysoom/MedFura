@@ -26,6 +26,7 @@ import {
   List,
   FileText,
   SlidersHorizontal,
+  HardDrive,
 } from 'lucide-react';
 import { LibraryFolderItem, LibraryFileItem } from '../../types';
 import { ConfirmationDialog } from '../Common/ConfirmationDialog';
@@ -46,14 +47,6 @@ import {
   cancelManagedDownload,
   launchMediaInExternalPlayer,
 } from '../../utils/fileHelpers';
-import {
-  InAppMediaViewerModal,
-  InAppViewerItem,
-} from '../Common/InAppMediaViewerModal';
-import {
-  MediaLaunchChoiceModal,
-  MediaLaunchTarget,
-} from '../Common/MediaLaunchChoiceModal';
 import {
   DownloadManager,
   useDownloadManager,
@@ -131,11 +124,6 @@ export const LibraryView: React.FC = () => {
       prev.includes(fileId) ? prev.filter((id) => id !== fileId) : [...prev, fileId]
     );
   };
-
-  // Viewer Modal & Launch Choice Modal State
-  const [viewerItem, setViewerItem] = useState<InAppViewerItem | null>(null);
-  const [launchChoiceTarget, setLaunchChoiceTarget] =
-    useState<MediaLaunchTarget | null>(null);
 
   // Modals & Inline Form States for Folder Creation & Customization
   const [isAddFolderModalOpen, setIsAddFolderModalOpen] = useState(false);
@@ -272,24 +260,8 @@ export const LibraryView: React.FC = () => {
     });
   };
 
-  // Open file directly inside the In-App Viewer Modal
-  const openFileDirectlyInApp = (file: LibraryFileItem) => {
-    setViewerItem({
-      id: file.id,
-      type: 'file',
-      title: file.title,
-      subtitle: file.fileType,
-      authorOrDoctor: file.author,
-      fileSize: file.fileSize,
-      pages: file.pages,
-      format: file.format || 'PDF',
-      url: file.downloadUrl,
-      mimeType: file.mimeType || 'application/pdf',
-    });
-  };
-
-  // Open file directly as an external PDF file (without share sheet)
-  const handleOpenExternalPdf = async (file: LibraryFileItem) => {
+  // Open downloaded file directly via the Native Mobile OS Intent Chooser / System Sheet
+  const handleOpenDownloadedFile = async (file: LibraryFileItem) => {
     const medfurMeta = resolveFileMedFurMeta(
       file.folderId,
       file.title,
@@ -299,7 +271,7 @@ export const LibraryView: React.FC = () => {
       id: file.id,
       url: file.downloadUrl,
       fileName: medfurMeta.fileName,
-      mimeType: 'application/pdf',
+      mimeType: file.mimeType || 'application/pdf',
       title: file.title,
       subtitle: file.fileType,
       authorOrDoctor: file.author,
@@ -308,13 +280,12 @@ export const LibraryView: React.FC = () => {
       format: file.format || 'PDF',
       virtualPath: medfurMeta.virtualPath,
     });
-    setDownloadNotice(`تم فتح الملف كملف PDF خارجي: ${file.title}`);
-    setTimeout(() => setDownloadNotice(null), 3000);
   };
 
-  // Primary click on file card (Pages 2, 4, 5):
-  // - If already downloaded offline -> open directly as an external PDF file (per user preference)
-  // - If not downloaded yet -> start inline circular download immediately
+  // Primary click on file card:
+  // - If downloading -> cancel download
+  // - If already downloaded offline -> trigger native OS file chooser (navigator.share with File / native open)
+  // - If not downloaded yet -> start inline circular download & save to phone storage
   const handlePrimaryFileClick = (file: LibraryFileItem) => {
     const progress = activeDownloads[file.id];
     if (progress?.status === 'downloading') {
@@ -323,26 +294,28 @@ export const LibraryView: React.FC = () => {
     }
     const isOffline = cachedIds.includes(file.id);
     if (isOffline) {
-      handleOpenExternalPdf(file);
+      handleOpenDownloadedFile(file);
     } else {
-      handleDownloadFile(file);
+      handleDownloadFile(file, true);
     }
   };
 
-  // Open from DownloadManager cached record
+  // Open from DownloadManager cached record directly via native OS chooser
   const handleOpenFromDownloadManager = (record: StoredMediaRecord) => {
-    setViewerItem({
+    const isVid =
+      record.itemType === 'video' || record.mimeType?.startsWith('video/');
+    launchMediaInExternalPlayer({
       id: record.id,
-      type:
-        record.itemType ||
-        (record.mimeType?.startsWith('video/') ? 'video' : 'file'),
+      fileName: record.fileName,
+      virtualPath: record.virtualPath,
+      mimeType: record.mimeType || (isVid ? 'video/mp4' : 'application/pdf'),
       title: record.title || record.fileName.replace(/\.[^/.]+$/, ''),
       subtitle: record.subtitle,
       authorOrDoctor: record.authorOrDoctor,
+      itemType: isVid ? 'video' : 'file',
       pages: record.pages,
       duration: record.duration,
       format: record.format,
-      mimeType: record.mimeType,
     });
   };
 
@@ -780,9 +753,6 @@ export const LibraryView: React.FC = () => {
             onDownloadOffline={() => handleDownloadFile(file, true)}
             onShare={() => handleShareFile(file)}
             onSendTelegram={() => handleSendFileTelegram(file)}
-            onOpenExternal={() => handleOpenExternalPdf(file)}
-            externalLabel="فتح كملف PDF خارجي"
-            onOpenInApp={() => openFileDirectlyInApp(file)}
             onEdit={isAdmin ? () => handleOpenEditFileModal(file) : undefined}
             onDelete={
               isAdmin
@@ -809,7 +779,7 @@ export const LibraryView: React.FC = () => {
   return (
     <div
       dir="rtl"
-      className="w-full max-w-4xl mx-auto px-3 sm:px-5 py-3 sm:py-4 space-y-3.5 text-right overflow-x-hidden"
+      className="w-full max-w-4xl mx-auto px-3 sm:px-5 py-3 sm:py-4 pb-36 space-y-3.5 text-right"
     >
       {/* 1. EMERALD HEADER CARD (Matching Pages 1, 2, 3, 4, 5) */}
       <div className="bg-gradient-to-l from-emerald-500 via-emerald-600 to-teal-700 text-white rounded-3xl p-4 sm:p-5 shadow-lg space-y-3.5 dark-surface-preserve">
@@ -1022,6 +992,24 @@ export const LibraryView: React.FC = () => {
             })}
           </div>
         )}
+
+        {/* Row 3: Quick Banner to Full Phone Storage & Downloads Manager (MedFur) */}
+        <button
+          type="button"
+          onClick={() => setActiveSection('downloads')}
+          className="w-full px-3.5 py-2 rounded-2xl bg-[#0F1726] hover:bg-emerald-950/40 border border-slate-800/80 hover:border-emerald-500/40 flex items-center justify-between gap-2 text-xs transition-all cursor-pointer group"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <HardDrive className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="font-black text-slate-200 group-hover:text-emerald-300 truncate">
+              إدارة التنزيلات ومساحة الهاتف (مجلد MedFur)
+            </span>
+          </div>
+          <span className="text-[11px] font-black text-emerald-400 shrink-0 flex items-center gap-1">
+            <span>المساحة والمجلدات</span>
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </span>
+        </button>
       </div>
 
       {/* 3. FILTER, SORT & VIEW MODE BAR */}
@@ -1680,44 +1668,6 @@ export const LibraryView: React.FC = () => {
         isOpen={isDownloadManagerOpen}
         onClose={() => setIsDownloadManagerOpen(false)}
         onOpenMediaItem={handleOpenFromDownloadManager}
-      />
-
-      {/* Fast Chooser Modal (In-App Reader vs External Player) */}
-      <MediaLaunchChoiceModal
-        target={launchChoiceTarget}
-        onClose={() => setLaunchChoiceTarget(null)}
-        onOpenInApp={(target) => {
-          setLaunchChoiceTarget(null);
-          const foundFile = libraryFiles.find((f) => f.id === target.id);
-          if (foundFile) {
-            openFileDirectlyInApp(foundFile);
-          } else {
-            setViewerItem({
-              id: target.id,
-              type: 'file',
-              title: target.title,
-              subtitle: target.subtitle,
-              authorOrDoctor: target.authorOrDoctor,
-              fileSize: target.fileSize,
-              pages: target.pages,
-              format: target.format,
-              url: target.url,
-              mimeType: target.mimeType,
-            });
-          }
-        }}
-        onDownloadBoth={(target) => {
-          const foundFile = libraryFiles.find((f) => f.id === target.id);
-          if (foundFile) {
-            handleDownloadFile(foundFile);
-          }
-        }}
-      />
-
-      {/* In-App File & PDF Viewer Modal */}
-      <InAppMediaViewerModal
-        item={viewerItem}
-        onClose={() => setViewerItem(null)}
       />
 
       {/* Confirmation Dialog */}

@@ -13,13 +13,15 @@ import { DiscussionsView } from './components/Discussions/DiscussionsView';
 import { SettingsView } from './components/Settings/SettingsView';
 import { DirectChatWidget } from './components/Chat/DirectChatWidget';
 import { PWAInstallPrompt } from './components/Common/PWAInstallPrompt';
-import { DownloadManager } from './components/Common/DownloadManager';
+import { DownloadManager, DownloadsView } from './components/Common/DownloadManager';
+import { SplashScreen } from './components/Common/SplashScreen';
 import {
-  InAppMediaViewerModal,
-  InAppViewerItem,
-} from './components/Common/InAppMediaViewerModal';
-import { shouldShowGlobalHeader } from './utils/redesignStructureLogic';
+  shouldShowGlobalHeader,
+  shouldShowInitialSplash,
+} from './utils/redesignStructureLogic';
 import { Bell, FolderArchive, Building, X } from 'lucide-react';
+
+const SPLASH_SESSION_KEY = 'medfur_splash_seen_v1';
 
 const AppContent: React.FC = () => {
   const {
@@ -38,9 +40,32 @@ const AppContent: React.FC = () => {
     markNotificationAsRead,
   } = useApp();
 
+  const [showSplash, setShowSplash] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const seen = sessionStorage.getItem(SPLASH_SESSION_KEY) === '1';
+      return shouldShowInitialSplash(window.location.search, seen);
+    } catch {
+      return shouldShowInitialSplash(window.location.search, false);
+    }
+  });
+
+  useEffect(() => {
+    const handleReplaySplash = () => setShowSplash(true);
+    window.addEventListener('medfur:replay-splash', handleReplaySplash);
+    return () => window.removeEventListener('medfur:replay-splash', handleReplaySplash);
+  }, []);
+
+  const handleFinishSplash = () => {
+    try {
+      sessionStorage.setItem(SPLASH_SESSION_KEY, '1');
+    } catch {
+      // ignore storage errors
+    }
+    setShowSplash(false);
+  };
+
   const [showExitToast, setShowExitToast] = useState(false);
-  const [globalViewerItem, setGlobalViewerItem] =
-    useState<InAppViewerItem | null>(null);
   const lastBackPressTimeRef = useRef<number>(0);
   const isHandlingPopStateRef = useRef<boolean>(false);
 
@@ -249,6 +274,12 @@ const AppContent: React.FC = () => {
         {activeSection === 'marketplace' && <MarketplaceView />}
         {activeSection === 'discussions' && <DiscussionsView />}
         {activeSection === 'videos' && <VideosView />}
+        {activeSection === 'downloads' && (
+          <DownloadsView
+            onBack={() => setActiveSection('home')}
+            onNavigateSection={(sec) => setActiveSection(sec)}
+          />
+        )}
         {activeSection === 'grades' && <GradesView />}
         {activeSection === 'settings' && <SettingsView />}
         {(activeSection === 'announcements' || activeSection === 'about') && <AnnouncementsView />}
@@ -269,36 +300,17 @@ const AppContent: React.FC = () => {
         </div>
       )}
 
-      {/* Global Floating DownloadManager & Viewer for Cached Media */}
-      <DownloadManager
-        variant="floating"
-        onOpenMediaItem={(rec) =>
-          setGlobalViewerItem({
-            id: rec.id,
-            type:
-              rec.itemType ||
-              (rec.mimeType?.startsWith('video/') ? 'video' : 'file'),
-            title: rec.title || rec.fileName.replace(/\.[^/.]+$/, ''),
-            subtitle: rec.subtitle,
-            authorOrDoctor: rec.authorOrDoctor,
-            pages: rec.pages,
-            duration: rec.duration,
-            format: rec.format,
-            mimeType: rec.mimeType,
-          })
-        }
-      />
-
-      <InAppMediaViewerModal
-        item={globalViewerItem}
-        onClose={() => setGlobalViewerItem(null)}
-      />
+      {/* Global Floating DownloadManager */}
+      <DownloadManager variant="floating" />
 
       {/* Direct Peer-to-Peer Chat Widget */}
       <DirectChatWidget />
 
       {/* Auth Modal */}
       <AuthModal />
+
+      {/* Initial Simple & Clean App Splash / Intro Screen */}
+      <SplashScreen isVisible={showSplash} onFinish={handleFinishSplash} />
     </div>
   );
 };

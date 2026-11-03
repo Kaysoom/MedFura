@@ -85,7 +85,9 @@ import {
   loadOfflineAutomationStatus,
   saveOfflineAutomationPackToStorage,
   OfflineAutomationStatusMap,
+  buildStructuredMedFurFileName,
 } from '../../utils/mediaAndOfflineLogic';
+import { saveAutomationQuestionPackToDownloads } from '../../utils/fileHelpers';
 import {
   SubjectQuickFilterTab,
   PersonalHierarchyCategory,
@@ -306,7 +308,7 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
   );
   const [offlineAutoNotice, setOfflineAutoNotice] = useState<string | null>(null);
 
-  const handleDownloadAutomationOffline = (scope: 'all' | 'subject', subjectId?: string) => {
+  const handleDownloadAutomationOffline = async (scope: 'all' | 'subject', subjectId?: string) => {
     const pack = buildOfflineAutomationPack({
       scope,
       subjects,
@@ -316,14 +318,34 @@ export const AutomationBankView: React.FC<AutomationBankViewProps> = ({ initialT
     const updatedStatus = saveOfflineAutomationPackToStorage(pack);
     setOfflineAutoStatus(updatedStatus);
 
+    const targetSub = subjectId ? subjects.find((s) => s.id === subjectId) : null;
+    const medfurMeta = buildStructuredMedFurFileName({
+      yearId: targetSub?.yearId || activeYear,
+      semester: targetSub?.semester || activeSemester,
+      subjectOrFolderName: targetSub?.name || 'بنك الأتمتة الشامل',
+      mediaType: 'automation',
+      title: targetSub ? `أسئلة_${targetSub.name}` : 'بنك_الأتمتة_الكامل',
+      extension: 'json',
+    });
+
+    await saveAutomationQuestionPackToDownloads({
+      id: scope === 'all' ? 'automation-pack-all' : `automation-pack-${subjectId}`,
+      title: targetSub ? `حزمة أتمتة ${targetSub.name}` : 'حزمة بنك الأتمتة الشامل',
+      subtitle: `${pack.questionsCount} سؤال مؤتمت مع الشرح`,
+      virtualPath: medfurMeta.virtualPath,
+      fileName: medfurMeta.fileName,
+      questionsCount: pack.questionsCount,
+      jsonString: JSON.stringify(pack),
+    });
+
     if (scope === 'all') {
       setOfflineAutoNotice(
-        `تم تنزيل وحفظ كامل بنك الأتمتة (${pack.questionsCount} سؤال في ${pack.subjectsCount} مواد) للعمل بدون إنترنت بنجاح ✓`
+        `تم تنزيل وحفظ كامل بنك الأتمتة (${pack.questionsCount} سؤال في ${pack.subjectsCount} مواد) على ذاكرة الهاتف ضمن مجلد MedFur ✓`
       );
     } else {
-      const subName = subjects.find((s) => s.id === subjectId)?.name || 'المادة';
+      const subName = targetSub?.name || 'المادة';
       setOfflineAutoNotice(
-        `تم تنزيل وحفظ جميع أسئلة أتمتة «${subName}» (${pack.questionsCount} سؤال) للعمل بدون إنترنت ✓`
+        `تم تنزيل وحفظ أسئلة أتمتة «${subName}» (${pack.questionsCount} سؤال) على ذاكرة الهاتف ضمن مجلد MedFur ✓`
       );
     }
     setTimeout(() => {

@@ -469,3 +469,25 @@ export function sortRootLibraryFolders(folders: LibraryFolderItem[]): LibraryFol
     return (a.orderIndex ?? 0) - (b.orderIndex ?? 0);
   });
 }
+
+export const APP_LOGO_ASSET_PATH = 'assets/aistudio/1793538605931_8b9593df.jpg';
+export const APP_ICON_SQUARE_PATH = 'icons/icon-512x512.png';
+
+/**
+ * Determines whether the initial splash/intro screen should be displayed on startup.
+ * Skips immediately when `?autostart=1` or `?skipIntro=1` is present in the URL query string,
+ * or when the splash has already been completed in the current session.
+ */
+export function shouldShowInitialSplash(
+  searchQueryString: string,
+  alreadyShownInSession: boolean
+): boolean {
+  if (alreadyShownInSession) return false;
+  const normalized = (searchQueryString || '').replace(/^\?/, '');
+  const params = new URLSearchParams(normalized);
+  if (params.get('autostart') === '1' || params.get('skipIntro') === '1') {
+    return false;
+  }
+  return true;
+}
+

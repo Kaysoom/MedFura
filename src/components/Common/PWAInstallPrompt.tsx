@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, X, Share, PlusSquare, Smartphone, CheckCircle2 } from 'lucide-react';
+import { APP_LOGO_ASSET_PATH } from '../../utils/redesignStructureLogic';
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -108,10 +109,17 @@ export const PWAInstallInstructionsModal: React.FC<{
             <X className="w-5 h-5" />
           </button>
 
-          <div>
+          <div className="flex items-center gap-2.5">
             <h3 className="font-black text-sm sm:text-base text-white">
               تثبيت تطبيق MedFur على جهازك
             </h3>
+            <div className="w-9 h-9 rounded-xl bg-white p-1 shadow-md flex items-center justify-center overflow-hidden shrink-0">
+              <img
+                src={APP_LOGO_ASSET_PATH}
+                alt="MedFur Logo"
+                className="w-full h-full object-cover scale-[2.15]"
+              />
+            </div>
           </div>
         </div>
 

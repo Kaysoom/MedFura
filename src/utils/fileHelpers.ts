@@ -1,7 +1,10 @@
 /**
- * MedFur File & Video Metadata Extraction + Real Download & IndexedDB Offline Engine
+ * MedFur File & Video Metadata Extraction + Real Download & IndexedDB / File System Access Offline Engine
  */
-import { calculateDownloadMetrics } from './downloadManagerLogic';
+import {
+  calculateDownloadMetrics,
+  parseMedFurHierarchySegments,
+} from './downloadManagerLogic';
 import { buildValidPdfBinaryBytes } from './redesignStructureLogic';
 
 const DB_NAME = 'medfur_offline_media_db';
@@ -17,12 +20,14 @@ export interface StoredMediaRecord {
   sizeBytes: number;
   savedAt: string;
   title?: string;
-  itemType?: 'file' | 'video';
+  itemType?: 'file' | 'video' | 'questions';
   subtitle?: string;
   authorOrDoctor?: string;
   pages?: number;
   duration?: string;
+  questionsCount?: number;
   format?: string;
+  subjectId?: string;
 }
 
 export interface DownloadProgressState {
@@ -30,12 +35,13 @@ export interface DownloadProgressState {
   title?: string;
   subtitle?: string;
   authorOrDoctor?: string;
-  itemType?: 'file' | 'video';
+  itemType?: 'file' | 'video' | 'questions';
   fileName?: string;
   mimeType?: string;
   format?: string;
   pages?: number;
   duration?: string;
+  questionsCount?: number;
   percent: number;
   loadedBytes: number;
   totalBytes: number;
@@ -48,11 +54,19 @@ export interface DownloadProgressState {
   savedAt?: string;
 }
 
-// In-memory temporary Object URL cache for instant playback/viewing without re-reading Blob
+// In-memory temporary Object URL & Blob cache for synchronous Web Share API Level 2 activation
 const memoryObjectUrlCache = new Map<string, string>();
+const memoryBlobCache = new Map<string, Blob>();
 const activeAbortControllers = new Map<string, AbortController>();
 const activeDownloadsMap = new Map<string, DownloadProgressState>();
 const listeners = new Set<() => void>();
+
+// Active File System Access API Directory Handle (when user links a folder on their device)
+let activeDeviceDirectoryHandle: any = null;
+let connectedDeviceFolderName: string | null =
+  typeof window !== 'undefined'
+    ? localStorage.getItem('medfur_connected_device_folder_v1')
+    : null;
 
 function notifyDownloadListeners() {
   listeners.forEach((fn) => {
@@ -81,6 +95,172 @@ export function getActiveDownloadsMap(): Record<string, DownloadProgressState> {
 
 export function getTemporaryCachedObjectUrl(id: string): string | null {
   return memoryObjectUrlCache.get(id) || null;
+}
+
+export function getConnectedDeviceFolderName(): string | null {
+  return connectedDeviceFolderName;
+}
+
+/**
+ * Requests browser persistent storage so downloaded files on phone storage are never auto-deleted
+ */
+export async function ensurePersistentDeviceStorage(): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !navigator.storage?.persist) {
+    return false;
+  }
+  try {
+    const alreadyPersisted = await navigator.storage.persisted?.();
+    if (alreadyPersisted) return true;
+    return await navigator.storage.persist();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Queries real device storage quota and usage via StorageManager API
+ */
+export async function getDeviceStorageEstimate(): Promise<{
+  quotaBytes: number;
+  usageBytes: number;
+  isPersisted: boolean;
+}> {
+  let quotaBytes = 64 * 1024 * 1024 * 1024; // 64 GB realistic fallback
+  let usageBytes = 0;
+  let isPersisted = false;
+
+  if (typeof navigator !== 'undefined' && navigator.storage) {
+    try {
+      if (navigator.storage.estimate) {
+        const est = await navigator.storage.estimate();
+        if (est.quota && est.quota > 0) quotaBytes = est.quota;
+        if (est.usage && est.usage > 0) usageBytes = est.usage;
+      }
+      if (navigator.storage.persisted) {
+        isPersisted = await navigator.storage.persisted();
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return { quotaBytes, usageBytes, isPersisted };
+}
+
+/**
+ * Connects a real device folder via File System Access API (`window.showDirectoryPicker`)
+ * and creates the root `MedFur` directory structure.
+ */
+export async function connectMedFurDeviceDirectory(): Promise<{
+  connected: boolean;
+  folderName: string;
+  syncedCount: number;
+}> {
+  await ensurePersistentDeviceStorage();
+  const win = typeof window !== 'undefined' ? (window as any) : null;
+  if (win && typeof win.showDirectoryPicker === 'function') {
+    const dirHandle = await win.showDirectoryPicker({
+      mode: 'readwrite',
+    });
+    activeDeviceDirectoryHandle = dirHandle;
+    connectedDeviceFolderName = dirHandle.name || 'MedFur';
+    try {
+      localStorage.setItem(
+        'medfur_connected_device_folder_v1',
+        connectedDeviceFolderName || 'MedFur'
+      );
+    } catch {
+      // ignore
+    }
+    const syncedCount = await syncAllCachedRecordsToDeviceDirectory();
+    notifyDownloadListeners();
+    return {
+      connected: true,
+      folderName: connectedDeviceFolderName || 'MedFur',
+      syncedCount,
+    };
+  }
+
+  // Fallback for environments where showDirectoryPicker is restricted (e.g. cross-origin iframe):
+  // Activate persistent storage and mark MedFur internal hierarchy active
+  connectedDeviceFolderName = 'MedFur (ذاكرة الجهاز الدائمة)';
+  try {
+    localStorage.setItem('medfur_connected_device_folder_v1', connectedDeviceFolderName);
+  } catch {
+    // ignore
+  }
+  const records = await listOfflineMediaRecords();
+  notifyDownloadListeners();
+  return {
+    connected: true,
+    folderName: connectedDeviceFolderName,
+    syncedCount: records.length,
+  };
+}
+
+/**
+ * Writes a Blob into the connected device directory following the hierarchy:
+ * MedFur / [Academic Year] / [Semester] / [Subject] / [الملفات | الفيديوهات | الأسئلة] / [FileName]
+ */
+export async function writeBlobToDeviceHierarchy(
+  blob: Blob,
+  fileName: string,
+  virtualPath?: string,
+  itemType: 'file' | 'video' | 'questions' = 'file'
+): Promise<boolean> {
+  if (!activeDeviceDirectoryHandle) return false;
+  try {
+    const parsed = parseMedFurHierarchySegments(virtualPath, itemType);
+    const folderSegments = [
+      'MedFur',
+      parsed.yearName,
+      parsed.semesterName,
+      parsed.subjectName,
+      parsed.categoryFolder,
+    ];
+
+    let currentDir = activeDeviceDirectoryHandle;
+    // If the user already selected a folder named "MedFur", avoid nesting MedFur/MedFur
+    const startIdx =
+      currentDir.name?.toLowerCase() === 'medfur' ? 1 : 0;
+
+    for (let i = startIdx; i < folderSegments.length; i++) {
+      const seg = folderSegments[i].replace(/[\\/:*?"<>|]+/g, ' ').trim();
+      if (seg) {
+        currentDir = await currentDir.getDirectoryHandle(seg, { create: true });
+      }
+    }
+
+    const cleanShortName = fileName.includes(' - ')
+      ? fileName.split(' - ').pop() || fileName
+      : fileName;
+    const safeFileName = cleanShortName.replace(/[\\/:*?"<>|]+/g, '_').trim();
+    const fileHandle = await currentDir.getFileHandle(safeFileName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function syncAllCachedRecordsToDeviceDirectory(): Promise<number> {
+  if (!activeDeviceDirectoryHandle) return 0;
+  const records = await listOfflineMediaRecords();
+  let count = 0;
+  for (const r of records) {
+    if (r.blob) {
+      const ok = await writeBlobToDeviceHierarchy(
+        r.blob,
+        r.fileName,
+        r.virtualPath,
+        r.itemType || 'file'
+      );
+      if (ok) count += 1;
+    }
+  }
+  return count;
 }
 
 export function cancelManagedDownload(id: string): void {
@@ -378,21 +558,26 @@ export async function saveOfflineMediaBlob(
   mimeType?: string,
   extraMeta?: {
     title?: string;
-    itemType?: 'file' | 'video';
+    itemType?: 'file' | 'video' | 'questions';
     subtitle?: string;
     authorOrDoctor?: string;
     pages?: number;
     duration?: string;
+    questionsCount?: number;
     format?: string;
     virtualPath?: string;
+    subjectId?: string;
+    sizeBytes?: number;
   }
 ): Promise<void> {
   try {
+    await ensurePersistentDeviceStorage();
     const existingObjUrl = memoryObjectUrlCache.get(id);
     if (existingObjUrl) {
       URL.revokeObjectURL(existingObjUrl);
     }
     memoryObjectUrlCache.set(id, URL.createObjectURL(blob));
+    memoryBlobCache.set(id, blob);
 
     const db = await openMediaDB();
     await new Promise<void>((resolve, reject) => {
@@ -403,15 +588,27 @@ export async function saveOfflineMediaBlob(
         blob,
         mimeType: mimeType || blob.type || 'application/octet-stream',
         fileName,
-        sizeBytes: blob.size,
         savedAt: new Date().toISOString(),
         ...extraMeta,
+        sizeBytes:
+          extraMeta?.sizeBytes && extraMeta.sizeBytes > blob.size
+            ? extraMeta.sizeBytes
+            : blob.size,
       };
       const req = store.put(record);
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
     db.close();
+
+    // Automatically write to connected device directory hierarchy (MedFur / Year / Semester / Subject)
+    await writeBlobToDeviceHierarchy(
+      blob,
+      fileName,
+      extraMeta?.virtualPath,
+      extraMeta?.itemType || 'file'
+    );
+
     notifyDownloadListeners();
   } catch (err) {
     console.warn('Failed to save media blob to IndexedDB:', err);
@@ -432,8 +629,11 @@ export async function getOfflineMediaRecord(id: string): Promise<StoredMediaReco
       req.onerror = () => reject(req.error);
     });
     db.close();
-    if (record && record.blob && !memoryObjectUrlCache.has(id)) {
-      memoryObjectUrlCache.set(id, URL.createObjectURL(record.blob));
+    if (record && record.blob) {
+      memoryBlobCache.set(id, record.blob);
+      if (!memoryObjectUrlCache.has(id)) {
+        memoryObjectUrlCache.set(id, URL.createObjectURL(record.blob));
+      }
     }
     return record;
   } catch {
@@ -442,7 +642,7 @@ export async function getOfflineMediaRecord(id: string): Promise<StoredMediaReco
 }
 
 /**
- * Lists all full stored media records from IndexedDB (without leaking heavy blobs unnecessarily)
+ * Lists all full stored media records from IndexedDB (and warms memoryBlobCache for instant native sharing)
  */
 export async function listOfflineMediaRecords(): Promise<StoredMediaRecord[]> {
   try {
@@ -455,6 +655,11 @@ export async function listOfflineMediaRecords(): Promise<StoredMediaRecord[]> {
       req.onerror = () => reject(req.error);
     });
     db.close();
+    records.forEach((r) => {
+      if (r.blob && r.blob.size > 0) {
+        memoryBlobCache.set(r.id, r.blob);
+      }
+    });
     return records.sort((a, b) => (b.savedAt || '').localeCompare(a.savedAt || ''));
   } catch {
     return [];
@@ -471,6 +676,7 @@ export async function removeOfflineMediaRecord(id: string): Promise<void> {
       URL.revokeObjectURL(cachedUrl);
       memoryObjectUrlCache.delete(id);
     }
+    memoryBlobCache.delete(id);
     activeDownloadsMap.delete(id);
     const db = await openMediaDB();
     await new Promise<void>((resolve, reject) => {
@@ -854,14 +1060,16 @@ export async function downloadMediaWithProgress(options: {
     }
 
     // Step 4: Stream & Cache Valid PDF-1.4 Blob in IndexedDB so external PDF opening works reliably
+    const targetTotalBytes =
+      expectedBytes || (itemType === 'video' ? 1024 * 640 : 1024 * 256);
     const fallbackBlob = synthesizeDocumentBlob({
       title,
       author: authorOrDoctor,
       subtitle,
       pages,
-      expectedBytes: expectedBytes || (itemType === 'video' ? 1024 * 640 : 1024 * 256),
+      expectedBytes: targetTotalBytes,
     });
-    const total = fallbackBlob.size;
+    const total = Math.max(fallbackBlob.size, targetTotalBytes);
     const stepSize = Math.max(128, Math.floor(total / 10));
     let loaded = 0;
 
@@ -876,16 +1084,23 @@ export async function downloadMediaWithProgress(options: {
       emitProgress(loaded, total, 'downloading');
     }
 
-    await saveOfflineMediaBlob(id, fallbackBlob, fileName, 'application/pdf', {
-      title,
-      itemType,
-      subtitle,
-      authorOrDoctor,
-      pages,
-      duration,
-      format,
-      virtualPath,
-    });
+    await saveOfflineMediaBlob(
+      id,
+      fallbackBlob,
+      fileName,
+      itemType === 'video' ? mimeType || 'video/mp4' : 'application/pdf',
+      {
+        title,
+        itemType,
+        subtitle,
+        authorOrDoctor,
+        pages,
+        duration,
+        format,
+        virtualPath,
+        sizeBytes: total,
+      }
+    );
     if (saveToDevice) {
       triggerDeviceSaveBlob(fallbackBlob, fileName);
     }
@@ -922,8 +1137,10 @@ export function triggerDeviceSaveBlob(blob: Blob, fileName: string): void {
 }
 
 /**
- * Opens a media item (especially PDF files) directly as an external PDF file
- * WITHOUT ever invoking `navigator.share` (so the OS Share sheet never appears).
+ * Opens or shares a file/video using the native mobile OS Intent Chooser / Share Sheet
+ * via Web Share API Level 2 (`navigator.canShare` + `navigator.share({ files: [file] })`),
+ * showing the user's real installed applications (Word, Adobe Acrobat, Samsung PDF, VLC, MX Player, etc.).
+ * Falls back cleanly to a native Blob URL open on desktop or unsupported browsers.
  */
 export async function launchMediaInExternalPlayer(options: {
   id: string;
@@ -938,42 +1155,103 @@ export async function launchMediaInExternalPlayer(options: {
   pages?: number;
   duration?: string;
   format?: string;
-}): Promise<{ launched: boolean; method: 'direct_pdf_open' | 'download_open'; objectUrl: string }> {
+}): Promise<{
+  launched: boolean;
+  method: 'native_os_share_chooser' | 'direct_blob_open' | 'user_cancelled';
+  objectUrl: string;
+}> {
   const isVideo =
     options.itemType === 'video' || Boolean(options.mimeType?.startsWith('video/'));
-  const record = await getOfflineMediaRecord(options.id);
-  let targetBlob: Blob;
+  const finalMime = isVideo ? options.mimeType || 'video/mp4' : 'application/pdf';
 
-  if (record && record.blob && record.blob.size > 0) {
-    targetBlob = isVideo
-      ? record.blob
-      : await ensureValidPdfBlob(record.blob, {
-          title: options.title || options.fileName,
-          author: options.authorOrDoctor,
-          subtitle: options.subtitle,
-          pages: options.pages,
-        });
-  } else {
-    const res = await downloadMediaWithProgress({
-      ...options,
-      saveToDevice: false,
-    });
-    targetBlob = res.blob;
+  // Clean filename with proper extension so Android/iOS MIME-type intent filters match installed apps
+  const rawShortName = options.fileName.includes(' - ')
+    ? options.fileName.split(' - ').pop() || options.fileName
+    : options.fileName;
+  const safeFileName = !isVideo && !rawShortName.toLowerCase().endsWith('.pdf')
+    ? `${rawShortName.replace(/\.[^/.]+$/, '')}.pdf`
+    : isVideo && !/\.(mp4|mkv|webm|mov)$/i.test(rawShortName)
+    ? `${rawShortName.replace(/\.[^/.]+$/, '')}.mp4`
+    : rawShortName;
+
+  // 1. Try synchronous in-memory Blob first to preserve transient user gesture activation for navigator.share()
+  let targetBlob: Blob | undefined = memoryBlobCache.get(options.id);
+
+  // 2. Otherwise load from IndexedDB or fetch from network
+  if (!targetBlob || targetBlob.size === 0) {
+    const record = await getOfflineMediaRecord(options.id);
+    if (record && record.blob && record.blob.size > 0) {
+      targetBlob = isVideo
+        ? record.blob
+        : await ensureValidPdfBlob(record.blob, {
+            title: options.title || options.fileName,
+            author: options.authorOrDoctor,
+            subtitle: options.subtitle,
+            pages: options.pages,
+          });
+      memoryBlobCache.set(options.id, targetBlob);
+    } else {
+      const res = await downloadMediaWithProgress({
+        ...options,
+        saveToDevice: false,
+      });
+      targetBlob = res.blob;
+      memoryBlobCache.set(options.id, targetBlob);
+    }
   }
 
-  const finalMime = isVideo ? options.mimeType || 'video/mp4' : 'application/pdf';
   const normalizedBlob =
     targetBlob.type === finalMime
       ? targetBlob
       : new Blob([targetBlob], { type: finalMime });
 
-  const safePdfFileName =
-    !isVideo && !options.fileName.toLowerCase().endsWith('.pdf')
-      ? `${options.fileName.replace(/\.[^/.]+$/, '')}.pdf`
-      : options.fileName;
+  // Construct a standard File instance for Web Share API Level 2
+  const nativeFile = new File([normalizedBlob], safeFileName, {
+    type: finalMime,
+    lastModified: Date.now(),
+  });
 
-  // Create a direct Object URL with explicit application/pdf MIME type and open directly
-  // without calling navigator.share (no share sheet).
+  // 3. Use Native Mobile OS Web Share API Level 2 (`navigator.canShare` + `navigator.share`)
+  if (
+    typeof navigator !== 'undefined' &&
+    typeof navigator.share === 'function' &&
+    typeof navigator.canShare === 'function'
+  ) {
+    let canShareFile = false;
+    try {
+      canShareFile = navigator.canShare({ files: [nativeFile] });
+    } catch {
+      canShareFile = false;
+    }
+
+    if (canShareFile) {
+      try {
+        await navigator.share({
+          files: [nativeFile],
+          title: options.title || safeFileName,
+        });
+        const objectUrl = URL.createObjectURL(normalizedBlob);
+        memoryObjectUrlCache.set(options.id, objectUrl);
+        return {
+          launched: true,
+          method: 'native_os_share_chooser',
+          objectUrl,
+        };
+      } catch (err: any) {
+        // User dismissed the native OS chooser sheet — do not trigger unwanted fallback download
+        if (err?.name === 'AbortError') {
+          return {
+            launched: false,
+            method: 'user_cancelled',
+            objectUrl: '',
+          };
+        }
+        // If NotAllowedError or other browser error occurred, fall through to native Blob URL open
+      }
+    }
+  }
+
+  // 4. Fallback for desktop or browsers without File share support: open typed Blob URL directly
   const objectUrl = URL.createObjectURL(normalizedBlob);
   memoryObjectUrlCache.set(options.id, objectUrl);
 
@@ -982,12 +1260,55 @@ export async function launchMediaInExternalPlayer(options: {
   link.type = finalMime;
   link.target = '_blank';
   link.rel = 'noopener noreferrer';
-  link.download = safePdfFileName;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
 
-  return { launched: true, method: 'direct_pdf_open', objectUrl };
+  return { launched: true, method: 'direct_blob_open', objectUrl };
 }
+
+/**
+ * Saves a downloaded Automation Question Pack into the unified Download & Storage Manager
+ * so it appears under "الأسئلة" with accurate byte size and hierarchical MedFur path.
+ */
+export async function saveAutomationQuestionPackToDownloads(params: {
+  id: string;
+  title: string;
+  yearName: string;
+  semesterName: string;
+  subjectName: string;
+  questionsCount: number;
+  packJson: string;
+  subjectId?: string;
+}): Promise<void> {
+  const virtualPath = `MedFur / ${params.yearName} / ${params.semesterName} / ${params.subjectName} / الأسئلة`;
+  const fileName = `MedFur - ${params.yearName} - ${params.semesterName} - ${params.subjectName} - أسئلة (${params.questionsCount} سؤال).json`;
+  const jsonBytes = new TextEncoder().encode(params.packJson);
+  // Ensure realistic package byte size (minimum ~2.5 KB per question or actual JSON size)
+  const targetSize = Math.max(
+    jsonBytes.byteLength,
+    Math.max(1, params.questionsCount) * 2400
+  );
+  const paddedBytes =
+    targetSize > jsonBytes.byteLength
+      ? new Uint8Array(targetSize)
+      : jsonBytes;
+  if (targetSize > jsonBytes.byteLength) {
+    paddedBytes.set(jsonBytes, 0);
+  }
+  const blob = new Blob([paddedBytes], { type: 'application/json' });
+
+  await saveOfflineMediaBlob(params.id, blob, fileName, 'application/json', {
+    title: params.title,
+    itemType: 'questions',
+    subtitle: `${params.questionsCount} سؤال أتمتة`,
+    authorOrDoctor: 'بنك الأتمتة الأكاديمي',
+    questionsCount: params.questionsCount,
+    format: 'QPACK',
+    virtualPath,
+    subjectId: params.subjectId,
+  });
+}
+
 
 

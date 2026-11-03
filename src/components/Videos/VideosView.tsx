@@ -20,6 +20,7 @@ import {
   BookOpen,
   Users,
   Heart,
+  HardDrive,
 } from 'lucide-react';
 import { VideoItem, AcademicYearId, SemesterType, SubjectItem } from '../../types';
 import { ConfirmationDialog } from '../Common/ConfirmationDialog';
@@ -38,14 +39,6 @@ import {
   cancelManagedDownload,
   launchMediaInExternalPlayer,
 } from '../../utils/fileHelpers';
-import {
-  InAppMediaViewerModal,
-  InAppViewerItem,
-} from '../Common/InAppMediaViewerModal';
-import {
-  MediaLaunchChoiceModal,
-  MediaLaunchTarget,
-} from '../Common/MediaLaunchChoiceModal';
 import {
   DownloadManager,
   useDownloadManager,
@@ -127,10 +120,6 @@ export const VideosView: React.FC = () => {
     );
   };
 
-  // In-App Video Player & Launch Choice Modal State
-  const [viewerItem, setViewerItem] = useState<InAppViewerItem | null>(null);
-  const [launchChoiceTarget, setLaunchChoiceTarget] =
-    useState<MediaLaunchTarget | null>(null);
   const [isDownloadManagerOpen, setIsDownloadManagerOpen] = useState(false);
 
   // Offline & Real Download Notice State
@@ -270,27 +259,28 @@ export const VideosView: React.FC = () => {
     });
   };
 
-  // Open Video directly inside the In-App Player Modal
-  const openVideoDirectlyInApp = (vid: VideoItem) => {
+  // Open downloaded video directly via the Native Mobile OS Intent Chooser / System Sheet
+  const handleOpenDownloadedVideo = async (vid: VideoItem) => {
     updateVideo(vid.id, { viewsCount: (vid.viewsCount || 0) + 1 });
-    setViewerItem({
+    const medfurMeta = resolveVideoMedFurMeta(vid);
+    await launchMediaInExternalPlayer({
       id: vid.id,
-      type: 'video',
+      url: vid.videoUrl,
+      fileName: medfurMeta.fileName,
+      mimeType: vid.mimeType || 'video/mp4',
       title: vid.title,
       subtitle: vid.chapterName || vid.academicYear,
       authorOrDoctor: vid.doctorName,
-      fileSize: vid.fileSize,
+      itemType: 'video',
       duration: vid.duration,
-      url: vid.videoUrl,
-      mimeType: vid.mimeType || 'video/mp4',
-      description: vid.description,
+      virtualPath: medfurMeta.virtualPath,
     });
   };
 
   // Primary click on video row:
   // - If downloading -> cancel download
-  // - If already cached offline -> open directly in In-App Player
-  // - Otherwise -> start inline circular download immediately
+  // - If already cached offline -> trigger native OS video player chooser (navigator.share with File / native open)
+  // - Otherwise -> start inline circular download & save to phone storage
   const handlePrimaryVideoClick = (vid: VideoItem) => {
     const progress = activeDownloads[vid.id];
     if (progress?.status === 'downloading') {
@@ -299,25 +289,23 @@ export const VideosView: React.FC = () => {
     }
     const isOffline = cachedIds.includes(vid.id) || vid.requiresInternet === false;
     if (isOffline) {
-      openVideoDirectlyInApp(vid);
+      handleOpenDownloadedVideo(vid);
     } else {
-      handleDownloadVideo(null, vid, false);
+      handleDownloadVideo(null, vid, true);
     }
   };
 
   const handleOpenFromDownloadManager = (record: StoredMediaRecord) => {
-    setViewerItem({
+    launchMediaInExternalPlayer({
       id: record.id,
-      type:
-        record.itemType ||
-        (record.mimeType?.startsWith('video/') ? 'video' : 'file'),
+      fileName: record.fileName,
+      virtualPath: record.virtualPath,
+      mimeType: record.mimeType || 'video/mp4',
       title: record.title || record.fileName.replace(/\.[^/.]+$/, ''),
       subtitle: record.subtitle,
       authorOrDoctor: record.authorOrDoctor,
-      pages: record.pages,
+      itemType: 'video',
       duration: record.duration,
-      format: record.format,
-      mimeType: record.mimeType,
     });
   };
 
@@ -628,7 +616,7 @@ export const VideosView: React.FC = () => {
   return (
     <div
       dir="rtl"
-      className="w-full max-w-4xl mx-auto px-3 sm:px-5 py-3 sm:py-4 space-y-3.5 text-right overflow-x-hidden"
+      className="w-full max-w-4xl mx-auto px-3 sm:px-5 py-3 sm:py-4 pb-36 space-y-3.5 text-right"
     >
       {/* Toast Notification */}
       {downloadNotice && (
@@ -1151,15 +1139,6 @@ export const VideosView: React.FC = () => {
                         onDownloadOffline={() => handleDownloadVideo(null, vid, true)}
                         onShare={() => handleShareVideo(vid)}
                         onSendTelegram={() => handleSendVideoTelegram(vid)}
-                        onOpenExternal={() => {
-                          launchMediaInExternalPlayer({
-                            id: vid.id,
-                            url: vid.videoUrl,
-                            fileName: medfurMeta.fileName,
-                            mimeType: vid.mimeType || 'video/mp4',
-                            title: vid.title,
-                          });
-                        }}
                         onEdit={isAdmin ? () => handleOpenEditVideo(vid) : undefined}
                         onDelete={
                           isAdmin ? () => setConfirmDeleteVideo(vid) : undefined
@@ -1180,46 +1159,6 @@ export const VideosView: React.FC = () => {
         isOpen={isDownloadManagerOpen}
         onClose={() => setIsDownloadManagerOpen(false)}
         onOpenMediaItem={handleOpenFromDownloadManager}
-      />
-
-      {/* Fast Chooser Modal (In-App Video Player vs External Player) */}
-      <MediaLaunchChoiceModal
-        target={launchChoiceTarget}
-        onClose={() => setLaunchChoiceTarget(null)}
-        onOpenInApp={(target) => {
-          setLaunchChoiceTarget(null);
-          const foundVid = videos.find((v) => v.id === target.id);
-          if (foundVid) {
-            openVideoDirectlyInApp(foundVid);
-          } else {
-            setViewerItem({
-              id: target.id,
-              type: 'video',
-              title: target.title,
-              subtitle: target.subtitle,
-              authorOrDoctor: target.authorOrDoctor,
-              fileSize: target.fileSize,
-              duration: target.duration,
-              url: target.url,
-              mimeType: target.mimeType,
-              description: target.description,
-            });
-          }
-        }}
-        onDownloadBoth={(target) => {
-          const foundVid = videos.find((v) => v.id === target.id);
-          if (foundVid) {
-            handleDownloadVideo(null, foundVid);
-          }
-        }}
-      />
-
-      {/* ======================================================== */}
-      {/* IN-APP VIDEO PLAYER MODAL                                */}
-      {/* ======================================================== */}
-      <InAppMediaViewerModal
-        item={viewerItem}
-        onClose={() => setViewerItem(null)}
       />
 
       {/* ======================================================== */}
